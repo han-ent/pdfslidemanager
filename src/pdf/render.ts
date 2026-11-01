@@ -62,6 +62,12 @@ export function pdfRectToViewportRect(viewport: PdfJsViewportLike, rect: PdfBox)
     const [x1, y1, x2, y2] = viewport.convertToViewportRectangle([rect.x, rect.y, rect.x + rect.width, rect.y + rect.height]);
     return { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
   }
+  // pdfjs-dist >= 6.2 removed convertToViewportRectangle(); map the two corners instead.
+  if (viewport.convertToViewportPoint) {
+    const [x1 = 0, y1 = 0] = viewport.convertToViewportPoint(rect.x, rect.y);
+    const [x2 = 0, y2 = 0] = viewport.convertToViewportPoint(rect.x + rect.width, rect.y + rect.height);
+    return { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+  }
   return rect;
 }
 

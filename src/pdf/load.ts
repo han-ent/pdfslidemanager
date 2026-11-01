@@ -14,6 +14,7 @@ export interface PdfJsViewportLike {
   readonly width: number;
   readonly height: number;
   convertToViewportRectangle?(rect: [number, number, number, number]): [number, number, number, number];
+  convertToViewportPoint?(x: number, y: number): number[];
   convertToPdfPoint?(x: number, y: number): [number, number];
 }
 

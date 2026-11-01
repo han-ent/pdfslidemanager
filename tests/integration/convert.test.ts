@@ -124,7 +124,10 @@ async function expectPdfJsViewportRect(
     const pdf = await task.promise;
     const page = await pdf.getPage(1);
     const viewport = page.getViewport({ scale: 1 });
-    const rect = viewport.convertToViewportRectangle([crop.x, crop.y, crop.x + crop.width, crop.y + crop.height]);
+    // pdfjs-dist >= 6.2 dropped PageViewport.convertToViewportRectangle(); map both corners instead.
+    const [x1, y1] = viewport.convertToViewportPoint(crop.x, crop.y) as [number, number];
+    const [x2, y2] = viewport.convertToViewportPoint(crop.x + crop.width, crop.y + crop.height) as [number, number];
+    const rect = [x1, y1, x2, y2] as const;
     const normalized = {
       x: Math.round(Math.min(rect[0], rect[2])),
       y: Math.round(Math.min(rect[1], rect[3])),
