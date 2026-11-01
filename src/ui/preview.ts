@@ -155,18 +155,61 @@ export function renderExpectedOutputPreviews(page: PagePlan, sourceCanvas: HTMLC
   }
 }
 
+export interface PreviewDisplayBounds {
+  maxWidth: number;
+  maxHeight: number;
+}
+
+/** Minimum preview height in CSS px, matching the previous `calc(100vh - 240px)` rule's floor. */
+const MIN_PREVIEW_MAX_HEIGHT = 240;
+const PREVIEW_VERTICAL_CHROME = 240;
+
+/**
+ * Fit the rendered PDF bitmap into the preview frame while preserving its aspect ratio.
+ *
+ * The canvas, the page surface, and the crop overlay must all share exactly this box.
+ * Previously the canvas used `width: 100%; max-height: …; object-fit: contain`, so tall
+ * (portrait) pages were letterboxed *inside* the canvas element while the overlay was
+ * stretched to the element box, shifting/stretching every crop box horizontally.
+ */
+export function fitPreviewDisplaySize(bitmap: Pick<PdfBox, 'width' | 'height'>, bounds: PreviewDisplayBounds): Pick<PdfBox, 'width' | 'height'> {
+  if (!(bitmap.width > 0) || !(bitmap.height > 0) || !(bounds.maxWidth > 0)) return { width: 0, height: 0 };
+  const aspect = bitmap.width / bitmap.height;
+  let width = bounds.maxWidth;
+  let height = width / aspect;
+  if (bounds.maxHeight > 0 && height > bounds.maxHeight) {
+    height = bounds.maxHeight;
+    width = height * aspect;
+  }
+  return { width: roundCssPx(width), height: roundCssPx(height) };
+}
+
 export function syncPreviewSurfaceToCanvas(canvas: HTMLCanvasElement): void {
   const pageSurface = canvas.closest<HTMLElement>('.pdf-preview-page');
   const overlay = pageSurface?.querySelector<HTMLElement>('.crop-overlay');
   if (!pageSurface || !overlay) return;
-  const rect = canvas.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return;
-  const width = `${Math.round(rect.width)}px`;
-  const height = `${Math.round(rect.height)}px`;
+  const frame = pageSurface.closest<HTMLElement>('.pdf-preview-frame') ?? pageSurface.parentElement;
+  const frameWidth = frame?.clientWidth ?? 0;
+  const ratio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  // Never upscale past the rendered bitmap's CSS size (keeps text crisp, same as before).
+  const naturalWidth = canvas.width / ratio;
+  const maxWidth = naturalWidth > 0 ? Math.min(frameWidth, naturalWidth) : frameWidth;
+  const viewportHeight = typeof window === 'undefined' ? 0 : window.innerHeight;
+  const maxHeight = viewportHeight > 0 ? Math.max(MIN_PREVIEW_MAX_HEIGHT, viewportHeight - PREVIEW_VERTICAL_CHROME) : 0;
+  const size = fitPreviewDisplaySize({ width: canvas.width, height: canvas.height }, { maxWidth, maxHeight });
+  if (size.width <= 0 || size.height <= 0) return;
+  const width = `${size.width}px`;
+  const height = `${size.height}px`;
+  canvas.style.width = width;
+  canvas.style.height = height;
   pageSurface.style.width = width;
   pageSurface.style.height = height;
   overlay.style.width = width;
   overlay.style.height = height;
+}
+
+function roundCssPx(value: number): number {
+  return Math.floor(value * 100) / 100;
 }
 
 export function renderExpectedOutputPreviewCanvas(
@@ -218,7 +261,7 @@ export function expectedOutputPreviewGeometry(
 ): ExpectedOutputPreviewGeometry {
   const visualSize = visualPageSize(pageBox, pageBox.rotation ?? 0);
   const visualRect = pdfBoxToVisualRect(crop, pageBox);
-  const placement = fitCropWithinA4Landscape(crop);
+  const placement = fitCropWithinA4Landscape(visualRect);
   const sourceX = scaleDimension(visualRect.x, visualSize.width, sourceCanvasSize.width);
   const sourceY = scaleDimension(visualRect.y, visualSize.height, sourceCanvasSize.height);
   const sourceWidth = scaleDimension(visualRect.width, visualSize.width, sourceCanvasSize.width);

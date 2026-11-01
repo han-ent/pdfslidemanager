@@ -434,12 +434,11 @@ select:disabled {
 }
 
 .pdf-canvas {
+  /* Size is set in px by syncPreviewSurfaceToCanvas() so the canvas box, page surface and
+     crop overlay always share one aspect-preserving rectangle (no object-fit letterboxing). */
   grid-area: 1 / 1;
   display: block;
-  width: 100%;
-  height: auto;
-  max-height: calc(100vh - 240px);
-  object-fit: contain;
+  max-width: none;
   background: #ffffff;
 }
 
