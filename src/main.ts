@@ -478,4 +478,14 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+let previewResizeFrame = 0;
+window.addEventListener('resize', () => {
+  if (previewResizeFrame) cancelAnimationFrame(previewResizeFrame);
+  previewResizeFrame = requestAnimationFrame(() => {
+    previewResizeFrame = 0;
+    const canvas = app.querySelector<HTMLCanvasElement>('[data-testid="pdf-canvas"]');
+    if (canvas && canvas.width > 0 && canvas.height > 0) syncPreviewSurfaceToCanvas(canvas);
+  });
+});
+
 renderApp();

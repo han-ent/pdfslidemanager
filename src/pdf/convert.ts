@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, type PDFPage } from 'pdf-lib';
+import { degrees, PDFDocument, rgb, type PDFPage } from 'pdf-lib';
 import type { ConversionPlan as AppConversionPlan, CropBox, ExportResult, PageBox, PdfBox, WorkloadWarning } from '../types';
 import { assertCropBoxesBounded } from './grid';
 import { hashBytes } from './hash';
@@ -61,7 +61,7 @@ export async function convertPdfSlides(
     const pageBox = getEffectivePageBox(sourcePage);
     const crop = normalizeCropBox(region.cropBox);
     assertCropBoxesBounded([crop], pageBox);
-    await appendCropPage(outputDoc, sourcePage, crop);
+    await appendCropPage(outputDoc, sourcePage, crop, pageBox.rotation ?? 0);
     completed += 1;
     onProgress?.({ completed, total: regions.length, label: region.label ?? String(completed) });
   }
@@ -131,12 +131,44 @@ export function fitCropWithinA4Landscape(crop: Pick<PdfBox, 'width' | 'height'>)
   };
 }
 
-async function appendCropPage(outputDoc: PDFDocument, sourcePage: PDFPage, crop: PdfBox): Promise<void> {
+/**
+ * Size of a PDF-space crop as the reader sees it once the source page's /Rotate is applied.
+ * PDF.js previews (and every PDF viewer) show rotated pages upright, so the A4 fit must use
+ * this visual size, not the raw (unrotated) crop width/height.
+ */
+export function visualCropSize(crop: Pick<PdfBox, 'width' | 'height'>, rotation = 0): Pick<PdfBox, 'width' | 'height'> {
+  const normalized = normalizePageRotation(rotation);
+  return normalized === 90 || normalized === 270 ? { width: crop.height, height: crop.width } : { width: crop.width, height: crop.height };
+}
+
+/**
+ * Where to anchor drawPage() so an embedded (unrotated) crop, rotated clockwise by the source
+ * page's /Rotate, lands exactly on the contain-and-center placement rectangle.
+ * pdf-lib rotates counter-clockwise around (x, y), so we pass -rotation.
+ */
+export function rotatedDrawOrigin(placement: A4LandscapePlacement, rotation = 0): { x: number; y: number; rotate: number } {
+  const normalized = normalizePageRotation(rotation);
+  const { drawX, drawY, drawWidth, drawHeight } = placement;
+  switch (normalized) {
+    case 90:
+      return { x: drawX, y: drawY + drawHeight, rotate: -90 };
+    case 180:
+      return { x: drawX + drawWidth, y: drawY + drawHeight, rotate: -180 };
+    case 270:
+      return { x: drawX + drawWidth, y: drawY, rotate: -270 };
+    case 0:
+    default:
+      return { x: drawX, y: drawY, rotate: 0 };
+  }
+}
+
+async function appendCropPage(outputDoc: PDFDocument, sourcePage: PDFPage, crop: PdfBox, rotation: number): Promise<void> {
   const [embeddedPage] = await outputDoc.embedPages([sourcePage], [
     { left: crop.x, bottom: crop.y, right: crop.x + crop.width, top: crop.y + crop.height },
   ]);
   if (!embeddedPage) throw new Error('Unable to embed cropped source page.');
-  const placement = fitCropWithinA4Landscape(crop);
+  const visualSize = visualCropSize(crop, rotation);
+  const placement = fitCropWithinA4Landscape(visualSize);
   const outputPage = outputDoc.addPage([placement.pageWidth, placement.pageHeight]);
   outputPage.drawRectangle({
     x: 0,
@@ -145,12 +177,21 @@ async function appendCropPage(outputDoc: PDFDocument, sourcePage: PDFPage, crop:
     height: placement.pageHeight,
     color: rgb(A4_LANDSCAPE_BACKGROUND.red, A4_LANDSCAPE_BACKGROUND.green, A4_LANDSCAPE_BACKGROUND.blue),
   });
+  const normalizedRotation = normalizePageRotation(rotation);
+  const swapped = normalizedRotation === 90 || normalizedRotation === 270;
+  const origin = rotatedDrawOrigin(placement, rotation);
   outputPage.drawPage(embeddedPage, {
-    x: placement.drawX,
-    y: placement.drawY,
-    width: placement.drawWidth,
-    height: placement.drawHeight,
+    x: origin.x,
+    y: origin.y,
+    // Width/height are in the embedded page's own (unrotated) axes.
+    width: swapped ? placement.drawHeight : placement.drawWidth,
+    height: swapped ? placement.drawWidth : placement.drawHeight,
+    ...(origin.rotate !== 0 ? { rotate: degrees(origin.rotate) } : {}),
   });
+}
+
+function normalizePageRotation(rotation: number): number {
+  return (((Math.round(rotation / 90) * 90) % 360) + 360) % 360;
 }
 
 function normalizeRegions(plan: AppConversionPlan | LegacyConvertPlan): Array<{ sourcePageIndex: number; cropBox: PdfBox | { left: number; bottom: number; width: number; height: number }; label?: string }> {

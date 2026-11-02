@@ -256,8 +256,8 @@ function detectFramedGrid(imageData: ImageData): FrameGridDetection | undefined 
   return {
     columns: xIntervals.length,
     rows: yIntervals.length,
-    xRuns: intervalsToRuns(xIntervals),
-    yRuns: intervalsToRuns(yIntervals),
+    xRuns: intervalsToRuns(xIntervals, imageData.width),
+    yRuns: intervalsToRuns(yIntervals, imageData.height),
   };
 }
 
@@ -301,7 +301,11 @@ function selectRepeatedIntervals(lines: readonly number[], axisLength: number, a
   if (lines.length > MAX_FRAME_LINE_CANDIDATES) return [];
   const intervals: BoundaryInterval[] = [];
   const minSize = axisLength * 0.12;
-  const maxSize = axisLength * 0.72;
+  // A single framed slide column/row can span most of the page (e.g. 2-up portrait
+  // handouts with 4:3 slides are ~82% of the page width). Capping at 72% made the
+  // detector fall back to an interior vertical stroke (text, table rule) as the right
+  // edge and crop the slide in half. Multi-interval groups are naturally < 50% each.
+  const maxSize = axisLength * 0.96;
   for (let startIndex = 0; startIndex < lines.length - 1; startIndex += 1) {
     for (let endIndex = startIndex + 1; endIndex < lines.length; endIndex += 1) {
       const start = lines[startIndex]!;
@@ -351,14 +355,23 @@ function intervalGroupScore(intervals: readonly BoundaryInterval[]): number {
   return intervals.length * 10_000 + coverage - gaps * 0.15;
 }
 
-function intervalsToRuns(intervals: readonly BoundaryInterval[]): DetectionAxisRun[] {
-  return intervals.map((interval) => ({
-    start: interval.start,
-    end: interval.end,
-    center: interval.start + interval.size / 2,
-    meanDensity: 1,
-    peakDensity: 1,
-  }));
+// Frame lines are reported as single pixel indices (the centre of the dark run), so an
+// interval [start, end] excludes the right/bottom frame pixel and half of the left/top one.
+// Pad outward so the slide border itself stays inside the crop instead of being shaved off.
+const FRAME_EDGE_PAD_PX = 1;
+
+function intervalsToRuns(intervals: readonly BoundaryInterval[], axisLength: number): DetectionAxisRun[] {
+  return intervals.map((interval) => {
+    const start = Math.max(0, interval.start - FRAME_EDGE_PAD_PX);
+    const end = Math.min(axisLength, interval.end + 1 + FRAME_EDGE_PAD_PX);
+    return {
+      start,
+      end,
+      center: start + (end - start) / 2,
+      meanDensity: 1,
+      peakDensity: 1,
+    };
+  });
 }
 
 function groupConsecutive(values: readonly number[]): Array<{ start: number; end: number }> {
