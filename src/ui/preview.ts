@@ -1,3 +1,4 @@
+import { ko } from '../i18n/ko';
 import type { CropBox, PageBox, PagePlan, PdfBox } from '../types';
 import { A4_LANDSCAPE_PAGE, fitCropWithinA4Landscape } from '../pdf/convert';
 import { pdfBoxToVisualRect, visualPageSize, visualRectToPdfBox } from '../pdf/grid';
@@ -63,58 +64,100 @@ export interface PreviewStageOptions {
 }
 
 export function createThumbnailRail({ pages, selectedPageIndex, onSelectPage }: ThumbnailRailOptions): HTMLElement {
-  const rail = element('nav', { className: 'thumbnail-rail', attrs: { 'aria-label': 'PDF pages' } });
+  const rail = element('nav', { className: 'thumbnail-rail', attrs: { 'aria-label': ko.pagesNav } });
   const list = element('ol', { className: 'thumbnail-list' });
   pages.forEach((page, index) => {
     const button = element('button', {
-      className: index === selectedPageIndex ? 'thumbnail-button is-selected' : 'thumbnail-button',
+      className: thumbnailButtonClassName(page, index === selectedPageIndex),
       attrs: {
         type: 'button',
         'aria-current': index === selectedPageIndex ? 'page' : 'false',
-        'aria-label': `Page ${page.pageNumber}`,
-        title: `Page ${page.pageNumber}`,
+        'aria-label': ko.pageButton(page.pageNumber),
+        title: page.reviewState === 'review-needed' ? `${ko.pageButton(page.pageNumber)} · ${ko.reviewNeeded}` : ko.pageButton(page.pageNumber),
       },
     }, [
       element('span', { className: 'thumbnail-page-number', text: String(page.pageNumber) }),
     ]);
+    button.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      const scroller = button.closest<HTMLElement>('.thumbnail-rail');
+      if (!scroller || !isElementVisibleInContainer(scroller, button)) return;
+      scroller.dataset.lockedScroll = String(scroller.scrollTop);
+    });
     button.addEventListener('click', () => onSelectPage(index));
+    button.addEventListener('keydown', (event) => {
+      const nextIndex = thumbnailIndexForKey(event.key, index, pages.length);
+      if (nextIndex === null || nextIndex === index) return;
+      event.preventDefault();
+      onSelectPage(nextIndex);
+    });
     list.append(element('li', {}, [button]));
   });
   rail.append(list);
   return rail;
 }
 
+function thumbnailButtonClassName(page: PagePlan, selected: boolean): string {
+  const classes = ['thumbnail-button'];
+  if (selected) classes.push('is-selected');
+  if (page.reviewState === 'review-needed') classes.push('is-review');
+  return classes.join(' ');
+}
+
+function thumbnailIndexForKey(key: string, index: number, pageCount: number): number | null {
+  if (key === 'ArrowDown' || key === 'ArrowRight') return Math.min(pageCount - 1, index + 1);
+  if (key === 'ArrowUp' || key === 'ArrowLeft') return Math.max(0, index - 1);
+  if (key === 'Home') return 0;
+  if (key === 'End') return pageCount - 1;
+  return null;
+}
+
+export function isElementVisibleInContainer(container: HTMLElement, item: HTMLElement): boolean {
+  const containerRect = container.getBoundingClientRect();
+  const itemRect = item.getBoundingClientRect();
+  return itemRect.top >= containerRect.top - 1 && itemRect.bottom <= containerRect.bottom + 1;
+}
+
+/** Restore the page rail scroll. Reveal the selection only when it changed and is off-screen. */
+export function syncThumbnailRailScroll(rail: HTMLElement, scrollTop: number, selectionChanged: boolean, restoreFocus: boolean): void {
+  rail.scrollTop = scrollTop;
+  const selected = rail.querySelector<HTMLElement>('.thumbnail-button.is-selected');
+  if (!selected) return;
+  if (restoreFocus) selected.focus({ preventScroll: true });
+  if (!selectionChanged || isElementVisibleInContainer(rail, selected)) return;
+  selected.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
 export function createPreviewStage(page: PagePlan, options: PreviewStageOptions = {}): HTMLElement {
   const stage = element('section', {
     className: previewStageClassName(page),
-    attrs: { 'aria-label': 'Slide crop preview' },
+    attrs: { 'aria-label': ko.previewLabel },
   });
   const cropCount = page.cropBoxes.length;
-  const reviewSuffix = page.reviewState === 'review-needed' ? ' · review needed' : '';
-  const manualSuffix = page.overridden && page.origin === 'manual' ? ' · manual crop' : '';
+  const layoutLabel = page.grid.label ?? page.layoutId;
   stage.append(
     element('header', { className: 'preview-header' }, [
       element('div', {}, [
         element('span', { className: 'eyebrow', text: previewEyebrow(page) }),
-        element('h2', { text: `Page ${page.pageNumber}: ${page.grid.label ?? page.layoutId}` }),
+        element('h2', { text: ko.pageHeading(page.pageNumber, layoutLabel) }),
       ]),
       element('p', {
         className: 'preview-summary',
-        text: `${page.layoutId} · ${cropCount} output slide${cropCount === 1 ? '' : 's'}${reviewSuffix}${manualSuffix}`,
-        attrs: { 'data-testid': 'preview-summary' },
+        text: ko.previewSummary(layoutLabel, cropCount, page.reviewState === 'review-needed', Boolean(page.overridden && page.origin === 'manual')),
+        attrs: { 'data-testid': 'preview-summary', 'data-layout-id': page.layoutId },
       }),
     ]),
   );
 
   const frame = element('div', { className: 'pdf-preview-frame', attrs: { 'data-review': page.reviewState } });
   const pageSurface = element('div', { className: 'pdf-preview-page' });
-  const canvas = element('canvas', { className: 'pdf-canvas', attrs: { 'data-testid': 'pdf-canvas', 'aria-label': `Rendered PDF page ${page.pageNumber}` } }) as HTMLCanvasElement;
+  const canvas = element('canvas', { className: 'pdf-canvas', attrs: { 'data-testid': 'pdf-canvas', 'aria-label': ko.renderedPage(page.pageNumber) } }) as HTMLCanvasElement;
   const instructionsId = `crop-overlay-instructions-page-${page.pageNumber}`;
   const overlay = element('ol', {
     className: 'crop-overlay',
     attrs: {
       'data-testid': 'crop-overlay',
-      'aria-label': `Crop boxes for page ${page.pageNumber}`,
+      'aria-label': ko.cropBoxesForPage(page.pageNumber),
       'aria-describedby': instructionsId,
     },
   });
@@ -130,14 +173,14 @@ export function createPreviewStage(page: PagePlan, options: PreviewStageOptions 
   stage.append(createExpectedOutputPreview(page, options));
   stage.append(element('p', {
     className: 'sr-preview-summary visually-hidden',
-    text: 'Crop boxes are keyboard focusable. Use arrow keys to nudge the selected crop. Hold Alt or Option with arrow keys to resize it. Drag a selected crop or its handles with a pointer.',
+    text: ko.cropInstructions,
     attrs: { id: instructionsId },
   }));
 
   if (page.reviewState === 'review-needed') {
     stage.append(element('div', {
       className: 'notice notice-warning',
-      text: 'Review needed: automatic detection is uncertain for this page. Choose a layout or adjust crop spacing before export.',
+      text: ko.reviewNeededPage,
       attrs: { 'data-testid': 'review-needed-page' },
     }));
   }
@@ -292,15 +335,15 @@ function createExpectedOutputPreview(page: PagePlan, options: PreviewStageOption
   const preview = element('section', {
     className: 'expected-output-preview',
     attrs: {
-      'aria-label': `Expected exported A4 pages for page ${page.pageNumber}`,
+      'aria-label': ko.expectedOutputLabel(page.pageNumber),
       'data-testid': 'expected-output-preview',
     },
   }, [
     element('div', { className: 'expected-output-heading' }, [
-      element('h3', { text: 'Expected output preview' }),
+      element('h3', { text: ko.expectedOutputTitle }),
       element('p', {
         className: 'muted',
-        text: 'Each card uses the same A4 landscape contain-and-center rule as the exported PDF.',
+        text: ko.expectedOutputHint,
       }),
     ]),
   ]);
@@ -308,7 +351,7 @@ function createExpectedOutputPreview(page: PagePlan, options: PreviewStageOption
   if (page.cropBoxes.length === 0) {
     preview.append(element('p', {
       className: 'muted',
-      text: 'No output preview yet. Choose or adjust a crop layout first.',
+      text: ko.expectedOutputEmpty,
       attrs: { 'data-testid': 'expected-output-empty' },
     }));
     return preview;
@@ -323,17 +366,17 @@ function createExpectedOutputPreview(page: PagePlan, options: PreviewStageOption
         width: String(OUTPUT_PREVIEW_CANVAS_WIDTH),
         height: String(OUTPUT_PREVIEW_CANVAS_HEIGHT),
         'data-testid': 'expected-output-canvas',
-        'aria-label': `Expected exported A4 page ${cropIndex + 1} from crop ${crop.label}`,
+        'aria-label': ko.expectedCanvas(cropIndex + 1, crop.label),
       },
       dataset: { cropIndex: String(cropIndex) },
     }) as HTMLCanvasElement;
     const deleteButton = element('button', {
       className: 'expected-output-delete',
-      text: 'Delete',
+      text: ko.delete,
       attrs: {
         type: 'button',
         'data-testid': 'expected-output-delete-button',
-        'aria-label': `Delete expected output slide ${cropIndex + 1}`,
+        'aria-label': ko.deleteSlide(cropIndex + 1),
       },
     });
     deleteButton.addEventListener('click', () => {
@@ -352,12 +395,12 @@ function createExpectedOutputPreview(page: PagePlan, options: PreviewStageOption
         'data-testid': 'expected-output-card',
         'data-crop-x': String(crop.x),
         'data-crop-y': String(crop.y),
-        'aria-label': `Expected output slide ${cropIndex + 1}; drag to reorder`,
+        'aria-label': ko.outputCard(cropIndex + 1),
       },
     }, [
       canvas,
       element('div', { className: 'expected-output-card-footer' }, [
-        element('span', { className: 'expected-output-label', text: `Output ${cropIndex + 1}` }),
+        element('span', { className: 'expected-output-label', text: ko.outputLabel(cropIndex + 1) }),
         deleteButton,
       ]),
     ]);
@@ -433,10 +476,10 @@ function previewStageClassName(page: PagePlan): string {
 }
 
 function previewEyebrow(page: PagePlan): string {
-  if (page.overridden && page.origin === 'manual') return 'Manual crop';
-  if (page.overridden) return 'User override';
-  if (page.reviewState === 'review-needed') return 'Review needed';
-  return 'Suggested layout';
+  if (page.overridden && page.origin === 'manual') return ko.manualCrop;
+  if (page.overridden) return ko.userOverride;
+  if (page.reviewState === 'review-needed') return ko.reviewNeeded;
+  return ko.suggestedLayout;
 }
 
 function createCropOverlayItem(crop: CropBox, page: PagePlan, cropIndex: number, options: PreviewStageOptions): HTMLElement {
@@ -445,7 +488,8 @@ function createCropOverlayItem(crop: CropBox, page: PagePlan, cropIndex: number,
   const item = element('li', {
     className: cropOverlayItemClassName(isSelected, page),
     attrs: {
-      title: `Crop ${crop.label}`,
+      title: ko.cropTitle(crop.label),
+      'data-selected-label': ko.selectedCrop,
       'data-crop-label': crop.label,
       'data-crop-index': String(cropIndex),
       'data-testid': 'crop-overlay-item',
@@ -483,7 +527,7 @@ function cropOverlayItemClassName(isSelected: boolean, page: PagePlan): string {
 }
 
 function cropAriaLabel(crop: CropBox, page: PagePlan, cropIndex: number): string {
-  return `Page ${page.pageNumber}, crop ${cropIndex + 1} of ${page.cropBoxes.length}, label ${crop.label}, ${formatDimension(crop.width)} by ${formatDimension(crop.height)} PDF points.`;
+  return ko.cropAria(page.pageNumber, cropIndex + 1, page.cropBoxes.length, crop.label, formatDimension(crop.width), formatDimension(crop.height));
 }
 
 function handleCropPointerDown(
@@ -665,7 +709,7 @@ function applyCropOverlayStyle(item: HTMLElement, crop: CropBox, pageBox: PageBo
   item.style.top = rect.top;
   item.style.width = rect.width;
   item.style.height = rect.height;
-  item.setAttribute('aria-label', `Crop ${crop.label}, ${formatDimension(crop.width)} by ${formatDimension(crop.height)} PDF points.`);
+  item.setAttribute('aria-label', ko.cropAriaShort(crop.label, formatDimension(crop.width), formatDimension(crop.height)));
 }
 
 function isArrowKey(key: string): boolean {

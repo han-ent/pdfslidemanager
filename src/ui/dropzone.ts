@@ -1,3 +1,4 @@
+import { ko } from '../i18n/ko';
 import { element } from './dom';
 
 export interface DropZoneOptions {
@@ -15,7 +16,7 @@ export function createDropZone({ onFile }: DropZoneOptions): HTMLElement {
   });
   input.className = 'visually-hidden';
 
-  const browseButton = element('span', { className: 'button button-primary', text: 'Choose PDF' });
+  const browseButton = element('span', { className: 'button button-primary', text: ko.choosePdf });
   const dropZone = element(
     'label',
     {
@@ -26,14 +27,12 @@ export function createDropZone({ onFile }: DropZoneOptions): HTMLElement {
       },
     },
     [
-      element('span', { className: 'drop-icon', text: '⇩' }),
-      element('span', { className: 'eyebrow', text: 'PDF Slide Splitter' }),
-      element('h1', { text: 'Drop a lecture PDF and split it into one slide per page.' }),
-      element('p', {
-        text: 'Processed locally in your browser. Review the suggested grid before downloading a split PDF for GoodNotes or your PDF reader.',
-      }),
+      element('span', { className: 'drop-icon', attrs: { 'aria-hidden': 'true' }, text: '⇩' }),
+      element('span', { className: 'eyebrow', text: ko.dropEyebrow }),
+      element('h1', { text: ko.dropTitle }),
+      element('p', { text: ko.dropBody }),
       browseButton,
-      element('span', { className: 'privacy-note', text: 'No cloud upload · source file unchanged' }),
+      element('span', { className: 'privacy-note', text: ko.dropPrivacy }),
       input,
     ],
   );

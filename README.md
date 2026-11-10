@@ -1,4 +1,22 @@
-# PDF Slide Splitter
+# PDF 슬라이드 나누기
+
+강의나 학회 유인물 PDF를 브라우저 안에서 슬라이드별 PDF로 나눕니다. 파일은 올리지 않고, 내 기기에서만 처리합니다.
+
+앱: https://ys-laube.github.io/pdfslidemanager/
+
+## 사용법
+
+1. PDF를 끌어다 놓거나 **PDF 선택**으로 엽니다.
+2. 왼쪽 쪽 번호에서 확인할 쪽을 고릅니다. 스크롤한 위치는 쪽을 눌러도 유지됩니다.
+3. **현재 쪽**에서 레이아웃을 고릅니다. `1×1`, `1×2`, `2×1`, `2×2`, `2×3`, `3×2`.
+4. 미리보기에서 자르기 영역을 옮기거나 크기를 조절합니다. 아래 카드는 내보낼 페이지와 같습니다. 카드를 끌어 순서를 바꾸거나 **삭제**할 수 있습니다.
+5. **적용 범위**에서 이 쪽만, 같은 모양 쪽 전부, 또는 `2-8` 같은 범위를 고른 뒤 **적용**을 누릅니다.
+6. 같은 자르기를 다시 쓰려면 **현재 자르기 저장**을 누릅니다. 처음 이름은 `레이아웃 1`입니다. 고르면 현재 범위에 적용되고, `⋯`에서 이름 변경, 업데이트, 삭제를 합니다. 저장 항목은 이 PDF를 보는 동안만 유지됩니다.
+7. **PDF 내려받기**로 새 파일을 저장합니다. 원본은 바뀌지 않습니다.
+
+확인이 필요한 쪽은 레이아웃을 고르기 전에는 내려받을 수 없습니다. 100MB보다 큰 파일, 200쪽이 넘는 PDF, 출력이 1000쪽 넘을 때는 안내만 나오고 작업은 막지 않습니다.
+
+## PDF Slide Splitter
 
 PDF Slide Splitter is a static browser web app that turns multi-slide lecture or conference handout PDFs into one-slide-per-page PDFs for study workflows such as GoodNotes.
 
@@ -18,7 +36,7 @@ Live app: https://ys-laube.github.io/pdfslidemanager/
 - Loads PDFs locally with bundled PDF.js assets.
 - Suggests layouts per page, including 1×1, 1×2, 2×1, 2×2, 2×3, and 3×2/six-slides.
 - Supports mixed PDFs: users can change one page, apply a selected layout to a page range, or copy the current crop overlay as a template for matching pages.
-- Saves reusable crop layouts for the current PDF session: save the current crop as `Layout 1`, rename it, update it from the current page, apply it to explicit page ranges, or delete it when no longer needed.
+- Saves reusable crop layouts for the current PDF session: save the current crop as `레이아웃 1`, rename it, update it from the current page, apply it to explicit page ranges, or delete it when no longer needed.
 - Shows a crop-grid preview before export, with draggable/resizable crop boxes for manual correction.
 - Shows an expected-output preview that uses the same A4 landscape contain-and-pad geometry as the exported PDF.
 - Lets users drag expected-output slide cards to reorder output pages or delete unwanted output slides before download.
@@ -34,7 +52,7 @@ Detection is advisory: review the crop grid before export, especially for title/
 Use saved crop layouts when several pages share the same slide geometry:
 
 1. Load a PDF locally and choose a representative page.
-2. Pick or adjust the crop grid, then select **Save current crop layout**. The first saved layout is named `Layout 1`.
+2. Pick or adjust the crop grid, then select **현재 자르기 저장**. The first saved layout is named `레이아웃 1`.
 3. Rename the layout to something recognizable, such as `Lecture crops`.
 4. Enter an explicit page range like `2-8` or `2, 4, 6`, then select **Apply saved crop layout to range**.
 5. If the representative page changes later, previously applied pages do not update automatically. Select **Update from current page**, then apply the saved layout again to the page range that should receive the new crop.

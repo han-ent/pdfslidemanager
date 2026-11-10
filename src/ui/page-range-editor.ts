@@ -1,10 +1,13 @@
-import { LAYOUT_PRESETS } from "../pdf/grid";
-import type {
-  LayoutPresetId,
-  PagePlan,
-  SavedLayoutTemplate,
-} from "../types";
-import { element } from "./dom";
+import { ko, type ApplyScope } from '../i18n/ko';
+import { LAYOUT_PRESETS } from '../pdf/grid';
+import type { LayoutPresetId, PagePlan, SavedLayoutTemplate } from '../types';
+import { element } from './dom';
+
+export interface InspectorDraft {
+  scope: ApplyScope;
+  range: string;
+  menuOpen: boolean;
+}
 
 export interface InspectorPanelOptions {
   page: PagePlan;
@@ -12,6 +15,9 @@ export interface InspectorPanelOptions {
   savedLayouts?: readonly SavedLayoutTemplate[];
   selectedSavedLayoutId?: string;
   saveCurrentLayoutDisabledReason?: string;
+  similarPageRange?: string;
+  draft?: InspectorDraft;
+  onDraftChange?(draft: InspectorDraft): void;
   onLayoutChange(layoutId: LayoutPresetId): void;
   onApplyRange(range: string, layoutId: LayoutPresetId): void;
   onApplyCurrentTemplateToRange(range: string): void;
@@ -25,20 +31,23 @@ export interface InspectorPanelOptions {
 }
 
 const LAYOUT_ORDER: LayoutPresetId[] = [
-  "one-up",
-  "two-up-horizontal",
-  "two-up-vertical",
-  "two-by-two",
-  "two-by-three",
-  "three-by-two",
+  'one-up',
+  'two-up-vertical',
+  'two-up-horizontal',
+  'two-by-two',
+  'two-by-three',
+  'three-by-two',
 ];
 
 export function createInspectorPanel({
   page,
   pageCount,
   savedLayouts = [],
-  selectedSavedLayoutId = "",
-  saveCurrentLayoutDisabledReason = "",
+  selectedSavedLayoutId = '',
+  saveCurrentLayoutDisabledReason = '',
+  similarPageRange = '',
+  draft = { scope: 'page', range: '', menuOpen: false },
+  onDraftChange,
   onLayoutChange,
   onApplyRange,
   onApplyCurrentTemplateToRange,
@@ -50,71 +59,109 @@ export function createInspectorPanel({
   onDeleteSavedLayout,
   onApplySavedLayout,
 }: InspectorPanelOptions): HTMLElement {
-  const panel = element('section', { className: 'inspector-panel', attrs: { 'data-testid': 'inspector-panel', 'aria-label': 'Layout controls' } });
-  const gridPresetPicker = createLayoutPicker(page.layoutId, onLayoutChange);
+  const panel = element('section', {
+    className: 'inspector-panel',
+    attrs: { 'data-testid': 'inspector-panel', 'aria-label': ko.inspectorLabel },
+  });
+  const state: InspectorDraft = { scope: draft.scope, range: draft.range, menuOpen: draft.menuOpen };
+  const publishDraft = (): void => onDraftChange?.({ ...state });
 
-  const rangeInput = element("input", {
+  const rangeInput = element('input', {
     attrs: {
-      type: "text",
-      value: `${page.pageNumber}-${page.pageNumber}`,
-      'aria-label': 'Shared page range for grid presets and saved crop layouts',
+      type: 'text',
+      value: state.range,
+      'aria-label': ko.rangeAria,
       'data-testid': 'range-input',
-      placeholder: `1-${pageCount}`,
+      placeholder: ko.rangePlaceholder,
+      inputmode: 'text',
     },
+  }) as HTMLInputElement;
+  rangeInput.addEventListener('input', () => {
+    state.range = rangeInput.value;
+    publishDraft();
   });
-  const rangeInputLabel = element('label', { className: 'field-label' }, [element('span', { text: 'Shared page range' }), rangeInput]);
-  const gridPresetSelect = element('select', {
-    attrs: {
-      'aria-label': 'Grid preset to apply to range',
-      'data-testid': 'range-layout-select',
-    },
+
+  const scopeGroup = element('div', {
+    className: 'scope-choices',
+    attrs: { role: 'radiogroup', 'aria-label': ko.applyScope, 'data-testid': 'apply-scope' },
   });
-  for (const layoutId of LAYOUT_ORDER) {
-    const preset = LAYOUT_PRESETS[layoutId];
-    const option = element("option", {
-      text: preset.label,
-      attrs: { value: layoutId },
+  const pageRadio = createScopeRadio('page', ko.scopePage, 'apply-scope-page', state.scope === 'page');
+  const similarRadio = createScopeRadio('similar', ko.scopeSimilar, 'apply-scope-similar', state.scope === 'similar');
+  const rangeRadio = createScopeRadio('range', ko.scopeRange, 'apply-scope-range', state.scope === 'range');
+  const rangeChoice = element('label', { className: 'scope-choice scope-choice-range' }, [
+    rangeRadio,
+    element('span', { text: ko.scopeRange }),
+    rangeInput,
+  ]);
+  scopeGroup.append(
+    element('label', { className: 'scope-choice' }, [pageRadio, element('span', { text: ko.scopePage })]),
+    element('label', { className: 'scope-choice' }, [similarRadio, element('span', { text: ko.scopeSimilar })]),
+    rangeChoice,
+  );
+  for (const radio of [pageRadio, similarRadio, rangeRadio]) {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      state.scope = radio.value as ApplyScope;
+      publishDraft();
     });
-    option.selected = layoutId === page.layoutId;
-    gridPresetSelect.append(option);
   }
-  const gridPresetSelectLabel = element('label', { className: 'field-label' }, [element('span', { text: 'Grid preset to apply' }), gridPresetSelect]);
-  const applyGridPresetButton = element('button', {
+  rangeInput.addEventListener('focus', () => {
+    state.scope = 'range';
+    rangeRadio.checked = true;
+    publishDraft();
+  });
+
+  const rangeForScope = (): string => {
+    if (state.scope === 'page') return String(page.pageNumber);
+    if (state.scope === 'similar') return similarPageRange || String(page.pageNumber);
+    return rangeInput.value;
+  };
+
+  const applyButton = element('button', {
     className: 'button button-secondary',
-    text: 'Apply grid preset to range',
+    text: ko.apply,
     attrs: { type: 'button', 'data-testid': 'apply-range-button' },
   });
-  applyGridPresetButton.addEventListener('click', () => {
-    onApplyRange(rangeInput.value, gridPresetSelect.value as LayoutPresetId);
-  });
+  applyButton.addEventListener('click', () => onApplyRange(rangeForScope(), page.layoutId));
 
-  const applyTemplateButton = element('button', {
-    className: 'button button-secondary',
-    text: 'Copy current page crop to range',
+  const copyButton = element('button', {
+    className: 'button button-ghost',
+    text: ko.copyCrop,
     attrs: { type: 'button', 'data-testid': 'apply-current-template-button' },
   });
-  applyTemplateButton.addEventListener("click", () => {
-    onApplyCurrentTemplateToRange(rangeInput.value);
-  });
+  copyButton.addEventListener('click', () => onApplyCurrentTemplateToRange(rangeForScope()));
 
-  const resetButton = element("button", {
-    className: "button button-secondary",
-    text: "Reset this page",
-    attrs: { type: "button", "data-testid": "reset-page-button" },
+  const resetButton = element('button', {
+    className: 'button button-ghost',
+    text: ko.resetPage,
+    attrs: { type: 'button', 'data-testid': 'reset-page-button' },
   });
-  resetButton.addEventListener("click", onResetPage);
+  resetButton.addEventListener('click', onResetPage);
 
   panel.append(
     element('div', { className: 'panel-heading' }, [
-      element('span', { className: 'eyebrow', text: `Page ${page.pageNumber} of ${pageCount}` }),
-      element('h2', { text: 'Inspector' }),
+      element('span', { className: 'eyebrow', text: ko.currentPage }),
+      element('h2', { text: ko.pageFraction(page.pageNumber, pageCount) }),
+    ]),
+    element('div', { className: 'panel-section' }, [
+      createLayoutPicker(page.layoutId, onLayoutChange),
+    ]),
+    element('div', { className: 'panel-section' }, [
+      element('h3', { text: ko.applyScope }),
+      scopeGroup,
+      applyButton,
+      element('div', { className: 'inspector-text-actions' }, [resetButton, copyButton]),
     ]),
     createSavedLayoutsSection({
       savedLayouts,
       selectedSavedLayoutId,
       saveCurrentLayoutDisabledReason,
-      rangeInput,
-      rangeInputLabel,
+      menuOpen: state.menuOpen,
+      rangeForScope,
+      onMenuOpenChange: (open) => {
+        state.menuOpen = open;
+        publishDraft();
+      },
       onSaveCurrentLayout,
       onSelectSavedLayout,
       onRenameSavedLayout,
@@ -122,29 +169,31 @@ export function createInspectorPanel({
       onDeleteSavedLayout,
       onApplySavedLayout,
     }),
-    element('div', { className: 'panel-section' }, [
-      element('h3', { text: 'Grid preset' }),
-      element('p', { className: 'muted', text: 'Choose this page layout, or apply one grid preset to the shared range above.' }),
-      gridPresetPicker,
-      element('div', { className: 'range-row' }, [gridPresetSelectLabel]),
-      applyGridPresetButton,
-      resetButton,
-    ]),
-    element('div', { className: 'panel-section' }, [
-      element('h3', { text: 'Current page crop copy' }),
-      element('p', { className: 'muted', text: 'One-off copy to the shared range above without saving a layout.' }),
-      applyTemplateButton,
-    ]),
   );
   return panel;
+}
+
+function createScopeRadio(value: ApplyScope, label: string, testId: string, checked: boolean): HTMLInputElement {
+  const radio = element('input', {
+    attrs: {
+      type: 'radio',
+      name: 'apply-scope',
+      value,
+      'aria-label': label,
+      'data-testid': testId,
+    },
+  }) as HTMLInputElement;
+  radio.checked = checked;
+  return radio;
 }
 
 interface SavedLayoutsSectionOptions {
   savedLayouts: readonly SavedLayoutTemplate[];
   selectedSavedLayoutId: string;
   saveCurrentLayoutDisabledReason: string;
-  rangeInput: HTMLInputElement;
-  rangeInputLabel: HTMLLabelElement;
+  menuOpen: boolean;
+  rangeForScope(): string;
+  onMenuOpenChange(open: boolean): void;
   onSaveCurrentLayout: (() => void) | undefined;
   onSelectSavedLayout: ((layoutId: string) => void) | undefined;
   onRenameSavedLayout: ((layoutId: string, name: string) => void) | undefined;
@@ -157,8 +206,9 @@ function createSavedLayoutsSection({
   savedLayouts,
   selectedSavedLayoutId,
   saveCurrentLayoutDisabledReason,
-  rangeInput,
-  rangeInputLabel,
+  menuOpen,
+  rangeForScope,
+  onMenuOpenChange,
   onSaveCurrentLayout,
   onSelectSavedLayout,
   onRenameSavedLayout,
@@ -168,144 +218,158 @@ function createSavedLayoutsSection({
 }: SavedLayoutsSectionOptions): HTMLElement {
   const selectedLayout = selectedSavedLayoutId ? savedLayouts.find((layout) => layout.id === selectedSavedLayoutId) : undefined;
   const selectedId = selectedLayout?.id ?? '';
-  const hasSavedLayout = selectedId !== '';
-  const noSavedLayoutReason = 'Save the current crop layout before using saved crop layout actions.';
-  const noSelectedLayoutReason = 'Choose a saved crop layout before using saved crop layout actions.';
-  const savedLayoutActionDisabledReason = savedLayouts.length === 0 ? noSavedLayoutReason : noSelectedLayoutReason;
-  const saveDisabledReason = saveCurrentLayoutDisabledReason || (!onSaveCurrentLayout ? 'Saving is unavailable until a page is ready.' : '');
+  const saveDisabledReason = saveCurrentLayoutDisabledReason || (!onSaveCurrentLayout ? ko.saveUnavailable : '');
 
-  const saveButton = element("button", {
-    className: "button button-secondary",
-    text: "Save current crop layout",
-    attrs: { type: "button", "data-testid": "save-current-layout-button" },
+  const saveButton = element('button', {
+    className: 'button button-secondary',
+    text: ko.saveCurrent,
+    attrs: { type: 'button', 'data-testid': 'save-current-layout-button' },
   });
   saveButton.toggleAttribute('disabled', saveDisabledReason !== '');
   if (saveDisabledReason) saveButton.setAttribute('title', saveDisabledReason);
   saveButton.addEventListener('click', () => onSaveCurrentLayout?.());
 
-  const savedLayoutSelect = element("select", {
-    attrs: {
-      "aria-label": "Saved crop layout",
-      "data-testid": "saved-layout-select",
-    },
-  });
+  const children: Array<Node | null> = [
+    element('h3', { text: ko.saveCropHeading }),
+    element('p', { className: 'muted', text: ko.saveHint }),
+  ];
   if (savedLayouts.length === 0) {
-    savedLayoutSelect.append(
-      element("option", { text: "No saved layouts", attrs: { value: "" } }),
-    );
-  } else {
-    savedLayoutSelect.append(
-      element("option", {
-        text: "Choose saved layout",
-        attrs: { value: "" },
-      }),
-    );
+    children.push(element('p', {
+      className: 'muted',
+      text: ko.emptySaved,
+      attrs: { 'data-testid': 'saved-layout-empty-state' },
+    }));
+  }
+  if (saveDisabledReason) {
+    children.push(element('p', {
+      className: 'muted',
+      text: saveDisabledReason,
+      attrs: { 'data-testid': 'saved-layout-disabled-reason' },
+    }));
+  }
+
+  const rowChildren: Node[] = [saveButton];
+  if (savedLayouts.length > 0) {
+    const savedLayoutSelect = element('select', {
+      attrs: { 'aria-label': ko.savedLayout, 'data-testid': 'saved-layout-select' },
+    });
+    savedLayoutSelect.append(element('option', { text: ko.chooseSaved, attrs: { value: '' } }));
     for (const savedLayout of savedLayouts) {
-      const option = element("option", {
-        text: savedLayout.name,
-        attrs: { value: savedLayout.id },
-      });
+      const option = element('option', { text: savedLayout.name, attrs: { value: savedLayout.id } });
       option.selected = savedLayout.id === selectedId;
       savedLayoutSelect.append(option);
     }
+    if (!onSelectSavedLayout) {
+      savedLayoutSelect.toggleAttribute('disabled', true);
+      savedLayoutSelect.title = ko.selectUnavailable;
+    }
+    savedLayoutSelect.addEventListener('change', () => {
+      const layoutId = savedLayoutSelect.value;
+      onSelectSavedLayout?.(layoutId);
+      if (layoutId) onApplySavedLayout?.(rangeForScope(), layoutId);
+    });
+    rowChildren.push(savedLayoutSelect);
+
+    const menuButton = element('button', {
+      className: 'button button-ghost saved-menu-button',
+      text: '⋯',
+      attrs: {
+        type: 'button',
+        'data-testid': 'saved-layout-menu-button',
+        'aria-label': ko.savedMenu,
+        'aria-expanded': menuOpen ? 'true' : 'false',
+        'aria-controls': 'saved-layout-menu',
+      },
+    });
+    const menu = element('div', {
+      className: 'saved-menu',
+      attrs: { id: 'saved-layout-menu', 'data-testid': 'saved-layout-menu' },
+    });
+    if (!menuOpen) menu.hidden = true;
+    menuButton.addEventListener('click', () => {
+      const willOpen = menu.hidden !== false;
+      menu.hidden = !willOpen;
+      menuButton.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      onMenuOpenChange(willOpen);
+    });
+
+    if (!selectedId) {
+      menu.append(element('p', { className: 'muted', text: ko.menuNeedsSelection }));
+    } else {
+      const nameInput = element('input', {
+        attrs: {
+          type: 'text',
+          value: selectedLayout?.name ?? '',
+          'aria-label': ko.layoutName,
+          'data-testid': 'saved-layout-name-input',
+          placeholder: ko.layoutNamePlaceholder,
+        },
+      }) as HTMLInputElement;
+      const renameButton = createMenuButton(ko.rename, 'rename-saved-layout-button', Boolean(onRenameSavedLayout), ko.renameUnavailable, () => {
+        onRenameSavedLayout?.(selectedId, nameInput.value);
+      });
+      const updateReason = saveCurrentLayoutDisabledReason || (!onUpdateSavedLayout ? ko.updateUnavailable : '');
+      const updateButton = createMenuButton(ko.updateFromPage, 'update-saved-layout-button', updateReason === '', updateReason, () => {
+        onUpdateSavedLayout?.(selectedId);
+      });
+      const applyButton = createMenuButton(ko.applySaved, 'apply-saved-layout-button', Boolean(onApplySavedLayout), ko.applySavedUnavailable, () => {
+        onApplySavedLayout?.(rangeForScope(), selectedId);
+      });
+      const deleteButton = createMenuButton(ko.deleteSaved, 'delete-saved-layout-button', Boolean(onDeleteSavedLayout), ko.deleteUnavailable, () => {
+        onDeleteSavedLayout?.(selectedId);
+      });
+      menu.append(
+        element('label', { className: 'field-label' }, [element('span', { text: ko.layoutName }), nameInput]),
+        renameButton,
+        updateButton,
+        applyButton,
+        deleteButton,
+      );
+    }
+    rowChildren.push(menuButton);
+    children.push(element('div', { className: 'saved-row' }, rowChildren), menu);
+  } else {
+    children.push(element('div', { className: 'saved-row' }, rowChildren));
   }
-  const selectDisabledReason = savedLayouts.length === 0 ? noSavedLayoutReason : !onSelectSavedLayout ? 'Saved crop layout selection is unavailable.' : '';
-  savedLayoutSelect.toggleAttribute('disabled', selectDisabledReason !== '');
-  if (selectDisabledReason) savedLayoutSelect.setAttribute('title', selectDisabledReason);
-  savedLayoutSelect.addEventListener('change', () => onSelectSavedLayout?.(savedLayoutSelect.value));
 
-  const nameInput = element("input", {
-    attrs: {
-      type: 'text',
-      value: selectedLayout?.name ?? '',
-      'aria-label': 'Saved crop layout name',
-      'data-testid': 'saved-layout-name-input',
-      placeholder: 'Crop layout name',
-    },
-  });
-  nameInput.toggleAttribute('disabled', !hasSavedLayout);
-  if (!hasSavedLayout) nameInput.setAttribute('title', savedLayoutActionDisabledReason);
-  const savedLayoutSelectLabel = element('label', { className: 'field-label' }, [element('span', { text: 'Saved crop layout' }), savedLayoutSelect]);
-  const nameInputLabel = element('label', { className: 'field-label' }, [element('span', { text: 'Layout name' }), nameInput]);
-
-  const renameDisabledReason = !hasSavedLayout ? savedLayoutActionDisabledReason : !onRenameSavedLayout ? 'Saved crop layout rename is unavailable.' : '';
-  const renameButton = createSavedLayoutActionButton('Rename saved crop layout', 'rename-saved-layout-button', renameDisabledReason === '', () => {
-    if (selectedId) onRenameSavedLayout?.(selectedId, nameInput.value);
-  }, renameDisabledReason);
-  const updateDisabledReason = !hasSavedLayout
-    ? savedLayoutActionDisabledReason
-    : saveCurrentLayoutDisabledReason || (!onUpdateSavedLayout ? 'Saved crop layout update is unavailable.' : '');
-  const updateButton = createSavedLayoutActionButton('Update from current page', 'update-saved-layout-button', updateDisabledReason === '', () => {
-    if (selectedId) onUpdateSavedLayout?.(selectedId);
-  }, updateDisabledReason);
-  const applyDisabledReason = !hasSavedLayout ? savedLayoutActionDisabledReason : !onApplySavedLayout ? 'Saved crop layout range apply is unavailable.' : '';
-  const applyButton = createSavedLayoutActionButton('Apply saved crop layout to range', 'apply-saved-layout-button', applyDisabledReason === '', () => {
-    if (selectedId) onApplySavedLayout?.(rangeInput.value, selectedId);
-  }, applyDisabledReason);
-  const deleteDisabledReason = !hasSavedLayout ? savedLayoutActionDisabledReason : !onDeleteSavedLayout ? 'Saved crop layout delete is unavailable.' : '';
-  const deleteButton = createSavedLayoutActionButton('Delete saved crop layout', 'delete-saved-layout-button', deleteDisabledReason === '', () => {
-    if (selectedId) onDeleteSavedLayout?.(selectedId);
-  }, deleteDisabledReason);
-  const emptyState = savedLayouts.length === 0
-    ? element('p', { className: 'muted', text: 'No saved crop layouts yet. Save the current crop layout after this page has crop boxes.', attrs: { 'data-testid': 'saved-layout-empty-state' } })
-    : null;
-  const disabledState = saveDisabledReason
-    ? element('p', { className: 'muted', text: saveDisabledReason, attrs: { 'data-testid': 'saved-layout-disabled-reason' } })
-    : null;
-
-  return element('div', { className: 'panel-section', attrs: { 'data-testid': 'saved-layouts-section' } }, [
-    element('h3', { text: 'Saved crop layouts' }),
-    element('p', { className: 'muted', text: 'Save a crop layout once, then apply it quickly to other pages in this PDF session.' }),
-    rangeInputLabel,
-    emptyState,
-    disabledState,
-    saveButton,
-    element('div', { className: 'range-row' }, [savedLayoutSelectLabel, nameInputLabel]),
-    renameButton,
-    updateButton,
-    applyButton,
-    deleteButton,
-  ]);
+  return element('div', { className: 'panel-section', attrs: { 'data-testid': 'saved-layouts-section' } }, children);
 }
 
-function createSavedLayoutActionButton(label: string, testId: string, enabled: boolean, onClick: () => void, disabledReason = ''): HTMLButtonElement {
+function createMenuButton(label: string, testId: string, enabled: boolean, disabledReason: string, onClick: () => void): HTMLButtonElement {
   const button = element('button', {
     className: 'button button-secondary',
     text: label,
-    attrs: { type: "button", "data-testid": testId },
+    attrs: { type: 'button', 'data-testid': testId },
   });
   button.toggleAttribute('disabled', !enabled);
-  if (!enabled && disabledReason) button.setAttribute('title', disabledReason);
+  if (!enabled && disabledReason) button.title = disabledReason;
   button.addEventListener('click', onClick);
   return button;
 }
 
-function createLayoutPicker(
-  selected: LayoutPresetId,
-  onChange: (layoutId: LayoutPresetId) => void,
-): HTMLElement {
-  const group = element("div", {
-    className: "segmented-picker",
+function createLayoutPicker(selected: LayoutPresetId, onChange: (layoutId: LayoutPresetId) => void): HTMLElement {
+  const group = element('div', {
+    className: 'segmented-picker',
     attrs: {
       role: 'radiogroup',
-      'aria-label': 'Grid preset for selected page',
+      'aria-label': ko.layoutChipsLabel,
       'data-testid': 'layout-picker',
     },
   });
   for (const layoutId of LAYOUT_ORDER) {
     const preset = LAYOUT_PRESETS[layoutId];
-    const button = element("button", {
-      className: `segment ${layoutId === selected ? "is-selected" : ""}`,
+    const button = element('button', {
+      className: `segment ${layoutId === selected ? 'is-selected' : ''}`,
       text: preset.label,
       attrs: {
-        type: "button",
-        role: "radio",
-        "aria-checked": String(layoutId === selected),
-        title: `${preset.columns} by ${preset.rows} slide grid`,
-        "data-testid": `layout-${layoutId}`,
+        type: 'button',
+        role: 'radio',
+        'aria-checked': String(layoutId === selected),
+        title: ko.gridTitle(preset.columns, preset.rows),
+        'data-testid': `layout-${layoutId}`,
       },
     });
-    button.addEventListener("click", () => onChange(layoutId));
+    button.addEventListener('click', () => onChange(layoutId));
     group.append(button);
   }
   return group;

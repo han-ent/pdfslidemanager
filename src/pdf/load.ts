@@ -1,3 +1,4 @@
+import { ko } from '../i18n/ko';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import type { PageBox } from '../types';
@@ -8,6 +9,7 @@ export interface PdfJsPageLike {
   readonly rotate?: number;
   getViewport(options: { scale: number; rotation?: number }): PdfJsViewportLike;
   render(options: { canvasContext: CanvasRenderingContext2D; viewport: PdfJsViewportLike }): { promise: Promise<void> };
+  cleanup?(resetStats?: boolean): void;
 }
 
 export interface PdfJsViewportLike {
@@ -22,6 +24,7 @@ export interface PdfJsDocumentLike {
   readonly numPages: number;
   getPage(pageNumber: number): Promise<PdfJsPageLike>;
   destroy?: () => Promise<void> | void;
+  cleanup?(): void;
 }
 
 export interface LoadedPdf {
@@ -40,7 +43,7 @@ type PdfJsRuntime = {
 export async function readPdfFile(file: File): Promise<LoadedPdf> {
   assertPdfFile(file);
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (bytes.byteLength === 0) throw new Error('Choose a non-empty PDF file.');
+  if (bytes.byteLength === 0) throw new Error(ko.chooseNonEmpty);
   const runtime = pdfjsLib as unknown as PdfJsRuntime;
   runtime.GlobalWorkerOptions.workerSrc = workerSrc;
   const pdfJsDocument = await runtime.getDocument({
@@ -71,7 +74,7 @@ export function pageBoxFromPdfJsPage(page: PdfJsPageLike): PageBox {
 export function assertPdfFile(file: File): void {
   const nameLooksPdf = file.name.toLowerCase().endsWith('.pdf');
   const typeLooksPdf = file.type === '' || file.type === 'application/pdf';
-  if (!nameLooksPdf && !typeLooksPdf) throw new Error('Choose a PDF file.');
+  if (!nameLooksPdf && !typeLooksPdf) throw new Error(ko.choosePdfFile);
 }
 
 function normalizeRotation(rotation: number): number {

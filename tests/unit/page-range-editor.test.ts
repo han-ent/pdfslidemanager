@@ -21,19 +21,24 @@ describe('createInspectorPanel saved layout controls', () => {
       onApplySavedLayout: () => undefined,
     });
 
-    expectText(panel, 'Inspector');
-    expectText(panel, 'Grid preset');
-    expectText(panel, 'Saved crop layouts');
-    expectText(panel, 'Current page crop copy');
-    expectText(panel, 'Save a crop layout once');
-    expect(panel.textContent!.indexOf('Saved crop layouts')).toBeLessThan(panel.textContent!.indexOf('Grid preset'));
+    expectText(panel, '현재 쪽');
+    expectText(panel, '1 / 4쪽');
+    expectText(panel, '적용 범위');
+    expectText(panel, '자르기 저장');
+    expectText(panel, '이 쪽만');
+    expectText(panel, '같은 모양 쪽 전부');
+    expectText(panel, '범위 입력');
+    expect(panel.textContent!.indexOf('1×1')).toBeLessThan(panel.textContent!.indexOf('적용 범위'));
+    expect(panel.textContent!.indexOf('적용 범위')).toBeLessThan(panel.textContent!.indexOf('자르기 저장'));
     expect(panel.textContent).not.toContain('Crop spacing');
-    expect(getByTestId(panel, 'layout-picker').getAttribute('aria-label')).toBe('Grid preset for selected page');
-    expect(getInput(panel, 'range-input').getAttribute('aria-label')).toBe('Shared page range for grid presets and saved crop layouts');
-    expect(getSelect(panel, 'range-layout-select').getAttribute('aria-label')).toBe('Grid preset to apply to range');
-    expectText(getButton(panel, 'apply-range-button'), 'Apply grid preset to range');
-    expectText(getButton(panel, 'apply-current-template-button'), 'Copy current page crop to range');
-    expectText(getButton(panel, 'apply-saved-layout-button'), 'Apply saved crop layout to range');
+    expect(panel.textContent).not.toContain('Session only');
+    expect(getByTestId(panel, 'layout-picker').getAttribute('aria-label')).toBe('레이아웃');
+    expect(getInput(panel, 'range-input').getAttribute('aria-label')).toBe('적용할 쪽 범위');
+    expect(panel.querySelector('[data-testid="range-layout-select"]')).toBeNull();
+    expectText(getButton(panel, 'apply-range-button'), '적용');
+    expectText(getButton(panel, 'apply-current-template-button'), '자르기 복사');
+    getButton(panel, 'saved-layout-menu-button').click();
+    expectText(getButton(panel, 'apply-saved-layout-button'), '저장본 적용');
   });
 
   it('shows an empty saved-layout state and disables saved-layout actions until a crop layout is saved', () => {
@@ -53,17 +58,13 @@ describe('createInspectorPanel saved layout controls', () => {
       onApplySavedLayout: () => undefined,
     });
 
-    const noSavedLayoutReason = 'Save the current crop layout before using saved crop layout actions.';
-    expectText(getByTestId(panel, 'saved-layout-empty-state'), 'No saved crop layouts yet');
+    expectText(getByTestId(panel, 'saved-layout-empty-state'), '저장한 자르기가 없습니다');
     expect(getButton(panel, 'save-current-layout-button').disabled).toBe(false);
-    expect(getSelect(panel, 'saved-layout-select').disabled).toBe(true);
-    expect(getSelect(panel, 'saved-layout-select').title).toBe(noSavedLayoutReason);
-    expect(getInput(panel, 'saved-layout-name-input').disabled).toBe(true);
-    expect(getInput(panel, 'saved-layout-name-input').title).toBe(noSavedLayoutReason);
+    expect(panel.querySelector('[data-testid="saved-layout-select"]')).toBeNull();
+    expect(panel.querySelector('[data-testid="saved-layout-name-input"]')).toBeNull();
+    expect(panel.querySelector('[data-testid="saved-layout-menu-button"]')).toBeNull();
     for (const testId of ['rename-saved-layout-button', 'update-saved-layout-button', 'apply-saved-layout-button', 'delete-saved-layout-button']) {
-      const button = getButton(panel, testId);
-      expect(button.disabled).toBe(true);
-      expect(button.title).toBe(noSavedLayoutReason);
+      expect(panel.querySelector(`[data-testid="${testId}"]`)).toBeNull();
     }
   });
 
@@ -89,26 +90,24 @@ describe('createInspectorPanel saved layout controls', () => {
     const select = getSelect(panel, 'saved-layout-select');
     expect(select.disabled).toBe(false);
     expect(select.value).toBe('');
-    expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['Choose saved layout', 'Layout 1', 'Layout 2']);
-    const chooseReason = 'Choose a saved crop layout before using saved crop layout actions.';
-    expect(getInput(panel, 'saved-layout-name-input').disabled).toBe(true);
-    expect(getInput(panel, 'saved-layout-name-input').title).toBe(chooseReason);
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['저장 항목 선택', 'Layout 1', 'Layout 2']);
+    expect(panel.querySelector('[data-testid="saved-layout-name-input"]')).toBeNull();
+    getButton(panel, 'saved-layout-menu-button').click();
+    expectText(panel, '항목을 고르면');
     for (const testId of ['rename-saved-layout-button', 'update-saved-layout-button', 'apply-saved-layout-button', 'delete-saved-layout-button']) {
-      const button = getButton(panel, testId);
-      expect(button.disabled).toBe(true);
-      expect(button.title).toBe(chooseReason);
+      expect(panel.querySelector(`[data-testid="${testId}"]`)).toBeNull();
     }
 
     select.value = 'saved-layout-1';
     select.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(calls).toEqual(['select:saved-layout-1']);
+    expect(calls).toEqual(['select:saved-layout-1', 'apply:1:saved-layout-1']);
   });
 
   it('disables saving or updating the current page when it needs review or has no crop boxes', () => {
     const reviewPanel = createInspectorPanel({
       page: createPagePlan({ reviewState: 'review-needed' }),
       pageCount: 1,
-      saveCurrentLayoutDisabledReason: 'Resolve review-needed crop boxes before saving this page as a layout.',
+      saveCurrentLayoutDisabledReason: '확인이 필요한 쪽은 저장할 수 없습니다. 레이아웃을 먼저 고르세요.',
       onLayoutChange: () => undefined,
       onApplyRange: () => undefined,
       onApplyCurrentTemplateToRange: () => undefined,
@@ -118,14 +117,14 @@ describe('createInspectorPanel saved layout controls', () => {
 
     const reviewSave = getButton(reviewPanel, 'save-current-layout-button');
     expect(reviewSave.disabled).toBe(true);
-    expect(reviewSave.title).toMatch(/review-needed/i);
+    expect(reviewSave.title).toMatch(/확인이 필요/);
 
     const noCropPanel = createInspectorPanel({
       page: createPagePlan({ cropBoxes: [] }),
       pageCount: 1,
       savedLayouts: [createSavedLayout('saved-layout-1', 'Layout 1')],
       selectedSavedLayoutId: 'saved-layout-1',
-      saveCurrentLayoutDisabledReason: 'Current page has no crop boxes to save as a layout.',
+      saveCurrentLayoutDisabledReason: '저장할 자르기 영역이 없습니다.',
       onLayoutChange: () => undefined,
       onApplyRange: () => undefined,
       onApplyCurrentTemplateToRange: () => undefined,
@@ -138,8 +137,8 @@ describe('createInspectorPanel saved layout controls', () => {
     const noCropUpdate = getButton(noCropPanel, 'update-saved-layout-button');
     expect(noCropSave.disabled).toBe(true);
     expect(noCropUpdate.disabled).toBe(true);
-    expect(noCropUpdate.title).toMatch(/no crop boxes/i);
-    expectText(getByTestId(noCropPanel, 'saved-layout-disabled-reason'), 'Current page has no crop boxes');
+    expect(noCropUpdate.title).toMatch(/자르기 영역이 없습니다/);
+    expectText(getByTestId(noCropPanel, 'saved-layout-disabled-reason'), '저장할 자르기 영역이 없습니다');
   });
 
   it('wires grid preset, current crop copy, and saved crop layout callbacks separately', () => {
@@ -162,8 +161,10 @@ describe('createInspectorPanel saved layout controls', () => {
     });
 
     getButton(panel, 'layout-three-by-two').click();
+    const rangeScope = getInput(panel, 'apply-scope-range');
+    rangeScope.checked = true;
+    rangeScope.dispatchEvent(new Event('change', { bubbles: true }));
     getInput(panel, 'range-input').value = '2, 4';
-    getSelect(panel, 'range-layout-select').value = 'two-by-two';
     getButton(panel, 'apply-range-button').click();
     getButton(panel, 'apply-current-template-button').click();
     getButton(panel, 'save-current-layout-button').click();
@@ -186,10 +187,11 @@ describe('createInspectorPanel saved layout controls', () => {
 
     expect(calls).toEqual([
       'grid-selected:three-by-two',
-      'grid-range:2, 4:two-by-two',
+      'grid-range:2, 4:two-up-horizontal',
       'copy-current:2, 4',
       'save',
       'select:saved-layout-1',
+      'apply:2, 4:saved-layout-1',
       'rename:saved-layout-2:Lecture Slides',
       'update:saved-layout-2',
       'apply:2, 4:saved-layout-2',

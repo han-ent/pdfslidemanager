@@ -23,7 +23,7 @@ describe('grid crop generation', () => {
     expect([...parsePageRange('1, 3', 3)]).toEqual([0, 2]);
     const updated = applyLayoutToPageRange(pages, '2-3', 'two-by-two');
     expect(updated.map((page) => page.layoutId)).toEqual(['one-up', 'two-by-two', 'two-by-two']);
-    expect(() => parsePageRange('0-2', 3)).toThrow(/outside/);
+    expect(() => parsePageRange('0-2', 3)).toThrow(/벗어/);
   });
 
   it('maps preview top-left canvas rectangles to bottom-left PDF coordinates', () => {

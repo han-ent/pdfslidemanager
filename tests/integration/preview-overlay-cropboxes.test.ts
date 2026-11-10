@@ -14,15 +14,15 @@ describe('preview crop overlay', () => {
     expect(overlay?.style.gridTemplateColumns).toBe('repeat(1, 1fr)');
     expect(overlay?.style.gridTemplateRows).toBe('repeat(1, 1fr)');
     expect(stage.querySelectorAll('[data-testid="expected-output-canvas"]')).toHaveLength(2);
-    expect(stage.querySelector('[data-testid="expected-output-preview"]')?.textContent).toContain('Expected output preview');
+    expect(stage.querySelector('[data-testid="expected-output-preview"]')?.textContent).toContain('미리보기');
   });
 
   it('surfaces review-needed pages next to the overlay', () => {
     const page = createPageWithActualDetectedCrops({ reviewState: 'review-needed', confidence: 'review-needed' });
     const stage = createPreviewStage(page);
 
-    expect(stage.querySelector('[data-testid="review-needed-page"]')?.textContent).toMatch(/review needed/i);
-    expect(stage.querySelector('[data-testid="preview-summary"]')?.textContent).toContain('2 output slides');
+    expect(stage.querySelector('[data-testid="review-needed-page"]')?.textContent).toMatch(/확인이 필요/);
+    expect(stage.querySelector('[data-testid="preview-summary"]')?.textContent).toContain('출력 2장');
   });
 
   it('keeps the page rail compact with page numbers only', () => {
@@ -38,8 +38,8 @@ describe('preview crop overlay', () => {
     const buttons = [...rail.querySelectorAll<HTMLButtonElement>('button')];
 
     expect(buttons.map((button) => button.textContent)).toEqual(['1', '2']);
-    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual(['Page 1', 'Page 2']);
-    expect(rail.textContent).not.toContain('Manual crop');
+    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual(['1쪽', '2쪽']);
+    expect(rail.textContent).not.toContain('직접 자름');
     expect(rail.textContent).not.toContain('high');
 
     buttons[0]?.click();

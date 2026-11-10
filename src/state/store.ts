@@ -1,3 +1,4 @@
+import { ko } from '../i18n/ko';
 import {
   applySavedLayoutTemplateToPageRange,
   buildConversionPlan,
@@ -70,7 +71,7 @@ export const initialState: AppState = Object.freeze({
   selectedSavedLayoutId: null,
   plan: null,
   exportResult: null,
-  statusMessage: 'Drop a PDF to begin.',
+  statusMessage: '',
   errorMessage: '',
   isDragging: false,
   error: null,
@@ -92,7 +93,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
         ...initialState,
         phase: 'loading',
         view: 'loading',
-        statusMessage: 'Reading PDF locally…',
+        statusMessage: ko.readingLocally,
       };
     case 'loaded':
       return {
@@ -108,7 +109,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
         selectedSavedLayoutId: null,
         plan: action.plan,
         selectedPageIndex: 0,
-        statusMessage: 'Suggested layouts are ready. Review the preview before export.',
+        statusMessage: ko.layoutsReady,
         errorMessage: '',
         error: null,
         exportResult: null,
@@ -124,7 +125,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
         plan: action.plan,
         selectedPageIndex: clamp(state.selectedPageIndex, 0, Math.max(0, action.pages.length - 1)),
         phase: state.phase === 'empty' ? 'ready' : state.phase,
-        statusMessage: 'Edits saved locally in this browser session.',
+        statusMessage: '',
         errorMessage: '',
         error: null,
       };
@@ -146,7 +147,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, phase: 'success', exportResult: action.result, statusMessage: action.message, errorMessage: '', error: null };
     case 'error':
     case 'load-error':
-      return { ...state, phase: 'error', errorMessage: action.message, error: action.message, statusMessage: 'Your edits are preserved. Adjust and try again.' };
+      return { ...state, phase: 'error', errorMessage: action.message, error: action.message, statusMessage: ko.editsPreserved };
     case 'drag-enter':
       return { ...state, isDragging: true, error: null, errorMessage: '' };
     case 'drag-leave':
@@ -162,10 +163,10 @@ export const reduceAppState = reducer;
 
 export function assertPageCanSaveSavedLayout(page: PagePlan): void {
   if (page.reviewState === 'review-needed') {
-    throw new RangeError('Review-needed pages cannot be saved as crop layouts.');
+    throw new RangeError(ko.reviewCannotSave);
   }
   if (page.cropBoxes.length === 0) {
-    throw new RangeError('Current page has no crop boxes to save.');
+    throw new RangeError(ko.noCropsToSave);
   }
 }
 
@@ -178,7 +179,7 @@ export function saveSavedLayoutFromPage(state: AppState, page: PagePlan, options
     ...state,
     savedLayouts,
     selectedSavedLayoutId: savedLayout.id,
-    statusMessage: `Saved crop layout "${savedLayout.name}" for this PDF session.`,
+    statusMessage: ko.savedStatus(savedLayout.name),
     errorMessage: '',
     error: null,
   };
@@ -189,7 +190,7 @@ export function selectSavedLayout(state: AppState, savedLayoutId: string | null)
     return {
       ...state,
       selectedSavedLayoutId: null,
-      statusMessage: 'No saved crop layout selected.',
+      statusMessage: ko.noneSelected,
       errorMessage: '',
       error: null,
     };
@@ -199,7 +200,7 @@ export function selectSavedLayout(state: AppState, savedLayoutId: string | null)
   return {
     ...state,
     selectedSavedLayoutId: savedLayout.id,
-    statusMessage: `Selected saved crop layout "${savedLayout.name}".`,
+    statusMessage: ko.selectedSaved(savedLayout.name),
     errorMessage: '',
     error: null,
   };
@@ -211,7 +212,7 @@ export function renameSavedLayout(state: AppState, savedLayoutId: string, name: 
   return {
     ...state,
     savedLayouts,
-    statusMessage: `Renamed saved crop layout to "${renamed.name}".`,
+    statusMessage: ko.renamedSaved(renamed.name),
     errorMessage: '',
     error: null,
   };
@@ -225,7 +226,7 @@ export function updateSavedLayoutFromPage(state: AppState, savedLayoutId: string
     ...state,
     savedLayouts,
     selectedSavedLayoutId: updated.id,
-    statusMessage: `Updated saved crop layout "${updated.name}" from page ${updated.sourcePageNumber}.`,
+    statusMessage: ko.updatedSaved(updated.name, updated.sourcePageNumber),
     errorMessage: '',
     error: null,
   };
@@ -241,7 +242,7 @@ export function deleteSavedLayout(state: AppState, savedLayoutId: string): AppSt
     ...state,
     savedLayouts,
     selectedSavedLayoutId,
-    statusMessage: `Deleted saved crop layout "${deleted.name}".`,
+    statusMessage: ko.deletedSaved(deleted.name),
     errorMessage: '',
     error: null,
   };
@@ -258,7 +259,7 @@ export function applySavedLayoutToPageRange(state: AppState, savedLayoutId: stri
     selectedSavedLayoutId: savedLayout.id,
     selectedPageIndex: clamp(state.selectedPageIndex, 0, Math.max(0, pages.length - 1)),
     phase: state.phase === 'empty' ? 'ready' : state.phase,
-    statusMessage: `Applied saved crop layout "${savedLayout.name}" to pages ${range.trim()}.`,
+    statusMessage: ko.appliedSaved(savedLayout.name, range.trim()),
     errorMessage: '',
     error: null,
   };
@@ -266,7 +267,7 @@ export function applySavedLayoutToPageRange(state: AppState, savedLayoutId: stri
 
 function findSavedLayoutOrThrow(savedLayouts: readonly SavedLayoutTemplate[], savedLayoutId: string): SavedLayoutTemplate {
   const savedLayout = savedLayouts.find((layout) => layout.id === savedLayoutId);
-  if (!savedLayout) throw new RangeError(`Saved crop layout "${savedLayoutId}" was not found.`);
+  if (!savedLayout) throw new RangeError(ko.savedNotFound(savedLayoutId));
   return savedLayout;
 }
 

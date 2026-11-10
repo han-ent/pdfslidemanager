@@ -1,3 +1,4 @@
+import { layoutLabels } from '../i18n/ko';
 import type { ConfidenceLevel, DetectedCropRect, DetectionMetadata, GridSpec, LayoutPresetId, PageBox, ReviewState } from '../types';
 import { LAYOUT_PRESETS } from './grid';
 import { detectProjectionLayout, geometryFallbackDetection } from './projection-detect';
@@ -54,10 +55,7 @@ function gridFromDetection(detection: DetectionMetadata): GridSpec {
   const preset = LAYOUT_PRESETS[detection.layoutId];
   return {
     id: detection.layoutId,
-    label:
-      detection.outcome === 'detected-grid'
-        ? `Detected ${detection.columns}×${detection.rows} slide grid`
-        : preset.label,
+    label: layoutLabels[detection.layoutId] ?? preset.label,
     columns: detection.columns,
     rows: detection.rows,
     readingOrder: 'row-major',
