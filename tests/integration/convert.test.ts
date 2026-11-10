@@ -96,7 +96,7 @@ describe('PDF conversion', () => {
   it('surfaces browser-only large workload soft warnings', () => {
     const warnings = estimateWorkloadWarnings(101 * 1024 * 1024, 201, 1_001);
     expect(warnings).toHaveLength(3);
-    expect(warnings.join(' ')).toMatch(/browser export/i);
+    expect(warnings.join(' ')).toMatch(/메모리/);
   });
 });
 

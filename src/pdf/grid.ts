@@ -1,3 +1,4 @@
+import { ko, layoutLabels } from '../i18n/ko';
 import type {
   ConversionPlan,
   CropBox,
@@ -27,12 +28,12 @@ const ZERO_INSETS: SpacingInsets = Object.freeze({ top: 0, right: 0, bottom: 0, 
 const ZERO_GUTTER: GridGutter = Object.freeze({ x: 0, y: 0 });
 
 export const LAYOUT_PRESETS: Readonly<Record<LayoutPresetId, Readonly<GridSpec & { id: LayoutPresetId; label: string }>>> = Object.freeze({
-  'one-up': Object.freeze({ id: 'one-up', label: '1x1', columns: 1, rows: 1, readingOrder: 'row-major' }),
-  'two-up-horizontal': Object.freeze({ id: 'two-up-horizontal', label: '2x1', columns: 2, rows: 1, readingOrder: 'row-major' }),
-  'two-up-vertical': Object.freeze({ id: 'two-up-vertical', label: '1x2', columns: 1, rows: 2, readingOrder: 'row-major' }),
-  'two-by-two': Object.freeze({ id: 'two-by-two', label: '2x2', columns: 2, rows: 2, readingOrder: 'row-major' }),
-  'two-by-three': Object.freeze({ id: 'two-by-three', label: '2x3', columns: 2, rows: 3, readingOrder: 'row-major' }),
-  'three-by-two': Object.freeze({ id: 'three-by-two', label: '3x2', columns: 3, rows: 2, readingOrder: 'row-major' }),
+  'one-up': Object.freeze({ id: 'one-up', label: layoutLabels['one-up'], columns: 1, rows: 1, readingOrder: 'row-major' }),
+  'two-up-horizontal': Object.freeze({ id: 'two-up-horizontal', label: layoutLabels['two-up-horizontal'], columns: 2, rows: 1, readingOrder: 'row-major' }),
+  'two-up-vertical': Object.freeze({ id: 'two-up-vertical', label: layoutLabels['two-up-vertical'], columns: 1, rows: 2, readingOrder: 'row-major' }),
+  'two-by-two': Object.freeze({ id: 'two-by-two', label: layoutLabels['two-by-two'], columns: 2, rows: 2, readingOrder: 'row-major' }),
+  'two-by-three': Object.freeze({ id: 'two-by-three', label: layoutLabels['two-by-three'], columns: 2, rows: 3, readingOrder: 'row-major' }),
+  'three-by-two': Object.freeze({ id: 'three-by-two', label: layoutLabels['three-by-two'], columns: 3, rows: 2, readingOrder: 'row-major' }),
 });
 
 export const PRESET_GRIDS = LAYOUT_PRESETS;
@@ -410,13 +411,13 @@ export interface CreateSavedLayoutTemplateOptions {
 export function getNextSavedLayoutName(savedLayouts: readonly Pick<SavedLayoutTemplate, 'name'>[]): string {
   const used = new Set<number>();
   for (const layout of savedLayouts) {
-    const match = /^Layout\s+([1-9]\d*)$/i.exec(layout.name.trim());
+    const match = /^(?:레이아웃|Layout)\s+([1-9]\d*)$/i.exec(layout.name.trim());
     if (match) used.add(Number(match[1]));
   }
 
   let candidate = 1;
   while (used.has(candidate)) candidate += 1;
-  return `Layout ${candidate}`;
+  return ko.layoutDefault(candidate);
 }
 
 export function validateSavedLayoutName(
@@ -425,16 +426,16 @@ export function validateSavedLayoutName(
   currentId?: string,
 ): string {
   const trimmed = name.trim();
-  if (!trimmed) throw new RangeError('Saved layout name must not be empty.');
+  if (!trimmed) throw new RangeError(ko.nameEmpty);
   const normalized = trimmed.toLocaleLowerCase();
   const duplicate = savedLayouts.some((layout) => layout.id !== currentId && layout.name.trim().toLocaleLowerCase() === normalized);
-  if (duplicate) throw new RangeError(`Saved layout name "${trimmed}" must be unique; duplicate names are not allowed.`);
+  if (duplicate) throw new RangeError(ko.nameDuplicate(trimmed));
   return trimmed;
 }
 
 export function createCropTemplateFromPage(page: PagePlan): CropTemplate {
-  if (page.reviewState === 'review-needed') throw new RangeError('Review-needed pages cannot be saved as crop layouts.');
-  if (page.cropBoxes.length === 0) throw new RangeError('Current page has no crop boxes to save.');
+  if (page.reviewState === 'review-needed') throw new RangeError(ko.reviewCannotSave);
+  if (page.cropBoxes.length === 0) throw new RangeError(ko.noCropsToSave);
   const rects = page.cropBoxes.map((cropBox, index) => {
     const visualRect = pdfBoxToVisualRect(cropBox, page.pageBox);
     const order = cropBox.order || index + 1;
@@ -471,9 +472,9 @@ function nextSavedLayoutId(savedLayouts: readonly Pick<SavedLayoutTemplate, 'id'
 
 function validateSavedLayoutId(id: string, savedLayouts: readonly Pick<SavedLayoutTemplate, 'id'>[], currentLayoutId?: string): string {
   const normalized = id.trim();
-  if (!normalized) throw new RangeError('Saved crop layout id must not be empty.');
+  if (!normalized) throw new RangeError(ko.savedEmptyId);
   const duplicate = savedLayouts.some((savedLayout) => savedLayout.id !== currentLayoutId && savedLayout.id === normalized);
-  if (duplicate) throw new RangeError(`Saved crop layout id "${normalized}" is already in use.`);
+  if (duplicate) throw new RangeError(ko.savedDuplicateId(normalized));
   return normalized;
 }
 
@@ -521,7 +522,7 @@ export function renameSavedLayoutTemplate(
   nameOrSavedLayouts?: string | readonly SavedLayoutTemplate[],
 ): SavedLayoutTemplate | SavedLayoutTemplate[] {
   if (Array.isArray(layoutOrLayouts)) {
-    if (typeof nameOrSavedLayouts !== 'string') throw new TypeError('Saved crop layout name is required.');
+    if (typeof nameOrSavedLayouts !== 'string') throw new TypeError(ko.savedNameRequired);
     const savedLayouts = layoutOrLayouts as readonly SavedLayoutTemplate[];
     const savedLayoutId = nameOrLayoutId;
     const normalizedName = validateSavedLayoutName(nameOrSavedLayouts, savedLayouts, savedLayoutId);
@@ -531,7 +532,7 @@ export function renameSavedLayoutTemplate(
       found = true;
       return { ...cloneSavedLayoutTemplate(savedLayout), name: normalizedName };
     });
-    if (!found) throw new RangeError(`Saved crop layout "${savedLayoutId}" was not found.`);
+    if (!found) throw new RangeError(ko.savedNotFound(savedLayoutId));
     return renamed;
   }
 
@@ -553,18 +554,18 @@ export function updateSavedLayoutTemplateFromPage(
   page?: PagePlan,
 ): SavedLayoutTemplate | SavedLayoutTemplate[] {
   if (Array.isArray(layoutOrLayouts)) {
-    if (typeof pageOrLayoutId !== 'string' || !page) throw new TypeError('Saved crop layout id and source page are required.');
+    if (typeof pageOrLayoutId !== 'string' || !page) throw new TypeError(ko.savedIdAndPageRequired);
     let found = false;
     const updated = layoutOrLayouts.map((savedLayout) => {
       if (savedLayout.id !== pageOrLayoutId) return savedLayout;
       found = true;
       return refreshSavedLayoutTemplateFromPage(savedLayout, page);
     });
-    if (!found) throw new RangeError(`Saved crop layout "${pageOrLayoutId}" was not found.`);
+    if (!found) throw new RangeError(ko.savedNotFound(pageOrLayoutId));
     return updated;
   }
 
-  if (typeof pageOrLayoutId === 'string') throw new TypeError('Source page is required.');
+  if (typeof pageOrLayoutId === 'string') throw new TypeError(ko.sourcePageRequired);
   const savedLayout = layoutOrLayouts as SavedLayoutTemplate;
   return refreshSavedLayoutTemplateFromPage(savedLayout, pageOrLayoutId);
 }
@@ -666,13 +667,13 @@ export function applyLayoutToPageRange(pages: readonly PagePlan[], range: string
 }
 
 export function applyCropTemplateToPageRange(pages: readonly PagePlan[], range: string, sourcePage: PagePlan): PagePlan[] {
-  if (sourcePage.cropBoxes.length === 0) throw new RangeError('Current page has no crop boxes to apply.');
+  if (sourcePage.cropBoxes.length === 0) throw new RangeError(ko.noCropsToApply);
   const indexes = parsePageRange(range, pages.length);
   return pages.map((page, index) => (indexes.has(index) ? applyCropTemplateFromPage(page, sourcePage) : page));
 }
 
 export function applyCropTemplateFromPage(page: PagePlan, sourcePage: PagePlan): PagePlan {
-  if (sourcePage.cropBoxes.length === 0) throw new RangeError('Current page has no crop boxes to apply.');
+  if (sourcePage.cropBoxes.length === 0) throw new RangeError(ko.noCropsToApply);
   const sourceTemplate = createCropTemplateFromPage(sourcePage);
   const template = scaleTemplateToPage(sourceTemplate, sourcePage.pageBox, page.pageBox);
   const cropBoxes = materializeCropBoxesFromTemplate(page.pageIndex, page.pageBox, template);
@@ -709,17 +710,17 @@ export function applySavedLayoutTemplateToPageRange(
   range: string,
   savedLayout: SavedLayoutTemplate,
 ): PagePlan[] {
-  if (savedLayout.template.rects.length === 0) throw new RangeError('Saved crop layout has no crop boxes to apply.');
+  if (savedLayout.template.rects.length === 0) throw new RangeError(ko.savedNoCrops);
   const sourcePage = pages[savedLayout.sourcePageIndex];
   if (!sourcePage) {
-    throw new RangeError(`Saved crop layout source page ${savedLayout.sourcePageIndex + 1} is outside 1-${pages.length}.`);
+    throw new RangeError(ko.savedSourceOutside(savedLayout.sourcePageIndex + 1, pages.length));
   }
 
   const indexes = [...parsePageRange(range, pages.length)].sort((a, b) => a - b);
   const updates = new Map<number, PagePlan>();
   for (const index of indexes) {
     const page = pages[index];
-    if (!page) throw new RangeError(`Page index ${index} is outside the loaded PDF.`);
+    if (!page) throw new RangeError(ko.pageIndexOutside(index + 1));
     updates.set(index, applySavedLayoutTemplateToPage(page, savedLayout, sourcePage.pageBox));
   }
 
@@ -731,7 +732,7 @@ export function applySavedLayoutTemplateToPage(
   savedLayout: SavedLayoutTemplate,
   sourcePageBox: PageBox,
 ): PagePlan {
-  if (savedLayout.template.rects.length === 0) throw new RangeError('Saved crop layout has no crop boxes to apply.');
+  if (savedLayout.template.rects.length === 0) throw new RangeError(ko.savedNoCrops);
   const template = scaleTemplateToPage(cloneCropTemplate(savedLayout.template), sourcePageBox, page.pageBox);
   const cropBoxes = materializeCropBoxesFromTemplate(page.pageIndex, page.pageBox, template);
   const layoutId = template.layoutId ?? layoutPresetForDimensions(template.columns, template.rows, page.layoutId);
@@ -841,10 +842,26 @@ export function applyOutputCropBoxesOverride(
   };
 }
 
+export function pageNumbersWithSameInitialLayout(
+  pageCount: number,
+  initialLayoutIds: readonly LayoutPresetId[],
+  currentLayoutIds: readonly LayoutPresetId[],
+  selectedIndex: number,
+): number[] {
+  const target = initialLayoutIds[selectedIndex] ?? currentLayoutIds[selectedIndex];
+  if (!target || pageCount <= 0) return [];
+  const numbers: number[] = [];
+  for (let index = 0; index < pageCount; index += 1) {
+    const origin = initialLayoutIds[index] ?? currentLayoutIds[index];
+    if (origin === target) numbers.push(index + 1);
+  }
+  return numbers;
+}
+
 export function parsePageRange(input: string, pageCount: number): Set<number> {
   const indexes = new Set<number>();
   const parts = normalizePageRangeInput(input).split(',').map((part) => part.trim()).filter(Boolean);
-  if (parts.length === 0) throw new RangeError('Enter a page number or range.');
+  if (parts.length === 0) throw new RangeError(ko.rangeEmpty);
 
   for (const part of parts) {
     const exclude = part.startsWith('!') || /^-\s*\d/.test(part);
@@ -866,12 +883,12 @@ function normalizePageRangeInput(input: string): string {
 function parsePageRangeToken(token: string, pageCount: number): [number, number] {
   if (token === '*' || /^all$/i.test(token)) return [1, pageCount];
   const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(token);
-  if (!match) throw new RangeError(`Invalid page range: ${token}`);
+  if (!match) throw new RangeError(ko.rangeInvalid(token));
   const first = Number(match[1]);
   const second = match[2] ? Number(match[2]) : first;
   const start = Math.min(first, second);
   const end = Math.max(first, second);
-  if (start < 1 || end > pageCount) throw new RangeError(`Page range ${token} is outside 1-${pageCount}.`);
+  if (start < 1 || end > pageCount) throw new RangeError(ko.rangeOutside(token, pageCount));
   return [start, end];
 }
 
@@ -963,7 +980,7 @@ export function assertCropBoxesBounded(crops: readonly (PdfBox | { left: number;
   for (const [index, crop] of crops.entries()) {
     const rect = normalizeRect(crop);
     if (!isBoxInside(rect, pageBox)) {
-      throw new RangeError(`Crop ${index + 1} is outside the effective source page box.`);
+      throw new RangeError(ko.cropOutside(index + 1));
     }
   }
 }
@@ -984,9 +1001,9 @@ export function estimateWorkloadWarnings(sourceByteLength: number, sourcePageCou
 
 function createPlanWarnings(sourceByteLength: number, sourcePageCount: number, estimatedOutputPages: number): string[] {
   const warnings: string[] = [];
-  if (sourceByteLength > 100 * 1024 * 1024) warnings.push('Large PDF: browser export memory use may be high, but the file stays local.');
-  if (sourcePageCount > 200) warnings.push('This PDF has many source pages; conversion may take a while.');
-  if (estimatedOutputPages > 1000) warnings.push('Estimated output is over 1000 pages; review in smaller batches if needed.');
+  if (sourceByteLength > 100 * 1024 * 1024) warnings.push(ko.warnLargeFile);
+  if (sourcePageCount > 200) warnings.push(ko.warnManyPages);
+  if (estimatedOutputPages > 1000) warnings.push(ko.warnManyOutput);
   return warnings;
 }
 

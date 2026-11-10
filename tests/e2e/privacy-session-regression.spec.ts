@@ -20,28 +20,30 @@ test('forgets saved crop layouts across reload and the next loaded PDF without b
   await page.goto('/');
   await page.getByTestId('pdf-input').setInputFiles(resolve(SESSION_FIXTURE));
   await expect(page.getByTestId('workspace')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('saved-layout-empty-state')).toContainText('No saved crop layouts yet');
+  await expect(page.getByTestId('saved-layout-empty-state')).toContainText('저장한 자르기가 없습니다');
 
   await page.getByTestId('layout-three-by-two').click();
   await expect(page.getByTestId('crop-overlay').locator('li')).toHaveCount(6);
   await page.getByTestId('save-current-layout-button').click();
   await expect(page.getByTestId('saved-layout-select')).toHaveValue('saved-layout-1');
-  await expect(page.getByTestId('saved-layout-select')).toContainText('Layout 1');
+  await expect(page.getByTestId('saved-layout-select')).toContainText('레이아웃 1');
 
+  await openSavedMenu(page);
   await page.getByTestId('saved-layout-name-input').fill('Session Layout');
   await page.getByTestId('rename-saved-layout-button').click();
   await expect(page.getByTestId('saved-layout-select')).toContainText('Session Layout');
+  await openSavedMenu(page);
   await expect(page.getByTestId('saved-layout-name-input')).toHaveValue('Session Layout');
   await expect.poll(() => browserStorageSnapshot(page)).toEqual({ localStorageKeys: [], sessionStorageKeys: [] });
 
   await page.reload();
-  await expect(page.getByTestId('dropzone')).toContainText('Processed locally');
+  await expect(page.getByTestId('dropzone')).toContainText('이 브라우저 안에서만');
   await expect.poll(() => browserStorageSnapshot(page)).toEqual({ localStorageKeys: [], sessionStorageKeys: [] });
 
   await page.getByTestId('pdf-input').setInputFiles(resolve(NEXT_FIXTURE));
   await expect(page.getByTestId('export-panel')).toContainText('e2e-session-next.pdf', { timeout: 20_000 });
-  await expect(page.getByTestId('saved-layout-empty-state')).toContainText('No saved crop layouts yet');
-  await expect(page.getByTestId('saved-layout-select')).toBeDisabled();
+  await expect(page.getByTestId('saved-layout-empty-state')).toContainText('저장한 자르기가 없습니다');
+  await expect(page.getByTestId('saved-layout-select')).toHaveCount(0);
 });
 
 test('exports locally without source mutation and every downloaded page is A4 landscape', async ({ page }) => {
@@ -65,14 +67,15 @@ test('exports locally without source mutation and every downloaded page is A4 la
   await expect(page.getByTestId('workspace')).toBeVisible({ timeout: 20_000 });
 
   await page.getByTestId('layout-three-by-two').click();
+  await page.getByTestId('apply-scope-range').check();
   await page.getByTestId('range-input').fill('2');
-  await page.getByTestId('range-layout-select').selectOption('three-by-two');
   await page.getByTestId('apply-range-button').click();
-  await expect(page.getByTestId('status-region')).toContainText('Edits saved locally in this browser session.');
+  await page.getByRole('button', { name: '2쪽', exact: true }).click();
+  await expect(page.getByTestId('crop-overlay').locator('li')).toHaveCount(6);
 
   await page.getByTestId('convert-button').click();
-  await expect(page.getByTestId('success-message')).toContainText('12 pages ready', { timeout: 30_000 });
-  await expect(page.getByTestId('success-message')).toContainText('Source file hash is unchanged');
+  await expect(page.getByTestId('success-message')).toContainText('12쪽 준비됨', { timeout: 30_000 });
+  await expect(page.getByTestId('success-message')).toContainText('원본 해시는 그대로입니다');
 
   const download = await Promise.all([
     page.waitForEvent('download'),
@@ -92,6 +95,12 @@ test('exports locally without source mutation and every downloaded page is A4 la
   expect(nonLocalRequests).toEqual([]);
   expect(mutatingRequests).toEqual([]);
 });
+
+async function openSavedMenu(page: Page): Promise<void> {
+  const menu = page.getByTestId('saved-layout-menu');
+  if (!(await menu.isVisible())) await page.getByTestId('saved-layout-menu-button').click();
+  await expect(menu).toBeVisible();
+}
 
 async function browserStorageSnapshot(page: Page): Promise<{ localStorageKeys: string[]; sessionStorageKeys: string[] }> {
   return page.evaluate(() => ({

@@ -1,3 +1,4 @@
+import { ko } from '../i18n/ko';
 import type { LoadedPdfSummary, WorkloadWarning } from '../types';
 
 const LARGE_FILE_BYTES = 100 * 1024 * 1024;
@@ -42,21 +43,21 @@ export function getWorkloadWarnings(input: {
   if (input.fileSize > LARGE_FILE_BYTES) {
     warnings.push({
       code: 'large-file',
-      message: `This PDF is ${formatBytes(input.fileSize)}. Large files may need more memory, but your edits will stay in this browser.`
+      message: ko.warnFileSize(formatBytes(input.fileSize))
     });
   }
 
   if (typeof input.pageCount === 'number' && input.pageCount > MANY_SOURCE_PAGES) {
     warnings.push({
       code: 'many-source-pages',
-      message: `This PDF has ${input.pageCount} pages. Review in sections if your browser becomes slow.`
+      message: ko.warnPageCount(input.pageCount)
     });
   }
 
   if (typeof input.estimatedOutputPages === 'number' && input.estimatedOutputPages > MANY_OUTPUT_PAGES) {
     warnings.push({
       code: 'many-output-pages',
-      message: `The split PDF may create about ${input.estimatedOutputPages} pages. Export may take a while.`
+      message: ko.warnOutputCount(input.estimatedOutputPages)
     });
   }
 
@@ -72,7 +73,7 @@ export async function hashBuffer(buffer: ArrayBuffer): Promise<string> {
 
 export async function summarizeLocalPdf(file: File): Promise<LoadedPdfSummary> {
   if (!isPdfFile(file)) {
-    throw new Error('Choose a PDF file to continue.');
+    throw new Error(ko.choosePdfFile);
   }
 
   const buffer = await file.arrayBuffer();

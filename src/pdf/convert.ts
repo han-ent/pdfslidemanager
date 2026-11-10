@@ -1,4 +1,5 @@
 import { degrees, PDFDocument, rgb, type PDFPage } from 'pdf-lib';
+import { ko } from '../i18n/ko';
 import type { ConversionPlan as AppConversionPlan, CropBox, ExportResult, PageBox, PdfBox, WorkloadWarning } from '../types';
 import { assertCropBoxesBounded } from './grid';
 import { hashBytes } from './hash';
@@ -57,7 +58,7 @@ export async function convertPdfSlides(
 
   for (const region of regions) {
     const sourcePage = sourcePages[region.sourcePageIndex];
-    if (!sourcePage) throw new Error(`Source page ${region.sourcePageIndex + 1} does not exist.`);
+    if (!sourcePage) throw new Error(ko.sourcePageMissing(region.sourcePageIndex + 1));
     const pageBox = getEffectivePageBox(sourcePage);
     const crop = normalizeCropBox(region.cropBox);
     assertCropBoxesBounded([crop], pageBox);
@@ -101,9 +102,9 @@ export function createWorkloadWarnings(input: {
   estimatedOutputPages: number;
 }): WorkloadWarning[] {
   const warnings: WorkloadWarning[] = [];
-  if (input.sourceBytes > 100 * 1024 * 1024) warnings.push({ code: 'large-source-file', message: 'Large source PDF may need more browser memory.' });
-  if (input.sourcePageCount > 200) warnings.push({ code: 'many-source-pages', message: 'Large page count may take longer to process locally.' });
-  if (input.estimatedOutputPages > 1000) warnings.push({ code: 'many-output-pages', message: 'Estimated output is over 1000 pages.' });
+  if (input.sourceBytes > 100 * 1024 * 1024) warnings.push({ code: 'large-source-file', message: ko.warnLargeFile });
+  if (input.sourcePageCount > 200) warnings.push({ code: 'many-source-pages', message: ko.warnManyPages });
+  if (input.estimatedOutputPages > 1000) warnings.push({ code: 'many-output-pages', message: ko.warnManyOutput });
   return warnings;
 }
 
@@ -117,7 +118,7 @@ export interface A4LandscapePlacement {
 }
 
 export function fitCropWithinA4Landscape(crop: Pick<PdfBox, 'width' | 'height'>): A4LandscapePlacement {
-  if (crop.width <= 0 || crop.height <= 0) throw new RangeError('Crop dimensions must be positive before A4 placement.');
+  if (crop.width <= 0 || crop.height <= 0) throw new RangeError(ko.cropPositive);
   const scale = Math.min(A4_LANDSCAPE_PAGE.width / crop.width, A4_LANDSCAPE_PAGE.height / crop.height);
   const drawWidth = roundPdfPoint(crop.width * scale);
   const drawHeight = roundPdfPoint(crop.height * scale);
@@ -166,7 +167,7 @@ async function appendCropPage(outputDoc: PDFDocument, sourcePage: PDFPage, crop:
   const [embeddedPage] = await outputDoc.embedPages([sourcePage], [
     { left: crop.x, bottom: crop.y, right: crop.x + crop.width, top: crop.y + crop.height },
   ]);
-  if (!embeddedPage) throw new Error('Unable to embed cropped source page.');
+  if (!embeddedPage) throw new Error(ko.embedFailed);
   const visualSize = visualCropSize(crop, rotation);
   const placement = fitCropWithinA4Landscape(visualSize);
   const outputPage = outputDoc.addPage([placement.pageWidth, placement.pageHeight]);

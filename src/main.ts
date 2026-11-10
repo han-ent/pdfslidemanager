@@ -1,6 +1,7 @@
 import './styles.css';
+import { ko } from './i18n/ko';
 import { createSplitPdf } from './pdf/convert';
-import { applyCropBoxOverride, applyCropTemplateToPageRange, applyLayoutToPageRange, applyOutputCropBoxesOverride, buildConversionPlan, createDetectedPagePlan, updatePageLayout } from './pdf/grid';
+import { applyCropBoxOverride, applyCropTemplateToPageRange, applyLayoutToPageRange, applyOutputCropBoxesOverride, buildConversionPlan, createDetectedPagePlan, pageNumbersWithSameInitialLayout, updatePageLayout } from './pdf/grid';
 import { suggestLayoutFromImage, suggestLayoutFromPageBox, type LayoutSuggestion } from './pdf/layout-detect';
 import { readPdfFile, type LoadedPdf } from './pdf/load';
 import { renderPdfPageForAnalysisWithMetadata, renderPdfPageToCanvas } from './pdf/render';
@@ -9,8 +10,8 @@ import type { AnalysisRenderMetadata, DetectionSource, LayoutPresetId, PagePlan 
 import { clear, element } from './ui/dom';
 import { createDropZone } from './ui/dropzone';
 import { createExportPanel, describeExportDisabledReason, installNoUploadNetworkGuard } from './ui/export';
-import { createInspectorPanel } from './ui/page-range-editor';
-import { createPreviewStage, createThumbnailRail, renderExpectedOutputPreviews, syncPreviewSurfaceToCanvas, type PreviewCropBoxChange, type PreviewCropBoxesChange } from './ui/preview';
+import { createInspectorPanel, type InspectorDraft } from './ui/page-range-editor';
+import { createPreviewStage, createThumbnailRail, renderExpectedOutputPreviews, syncPreviewSurfaceToCanvas, syncThumbnailRailScroll, type PreviewCropBoxChange, type PreviewCropBoxesChange } from './ui/preview';
 
 declare global {
   interface Window {
@@ -27,9 +28,13 @@ declare global {
   }
 }
 
+document.documentElement.lang = ko.htmlLang;
+document.title = ko.appTitle;
+document.querySelector('meta[name="description"]')?.setAttribute('content', ko.metaDescription);
+
 const appRoot = document.querySelector<HTMLDivElement>('#app');
 if (!appRoot) {
-  throw new Error('App root not found.');
+  throw new Error(ko.appRootMissing);
 }
 const app: HTMLDivElement = appRoot;
 
@@ -37,6 +42,15 @@ let state: AppState = { ...initialState };
 let loadedPdf: LoadedPdf | null = null;
 let objectUrl = '';
 let renderGeneration = 0;
+let railScrollTop = 0;
+let previousSelectedPageIndex = -1;
+let inspectorDraft: InspectorDraft = { scope: 'page', range: '', menuOpen: false };
+
+function resetTransientUi(): void {
+  railScrollTop = 0;
+  previousSelectedPageIndex = -1;
+  inspectorDraft = { scope: 'page', range: '', menuOpen: false };
+}
 
 function dispatch(action: Parameters<typeof reducer>[1]): void {
   state = reducer(state, action);
@@ -46,8 +60,16 @@ function dispatch(action: Parameters<typeof reducer>[1]): void {
 function renderApp(): void {
   renderGeneration += 1;
   const generation = renderGeneration;
+  const existingRail = app.querySelector<HTMLElement>('.thumbnail-rail');
+  if (existingRail) {
+    const lockedScroll = existingRail.dataset.lockedScroll;
+    railScrollTop = lockedScroll !== undefined ? Number(lockedScroll) : existingRail.scrollTop;
+  }
+  const selectionChanged = state.selectedPageIndex !== previousSelectedPageIndex;
+  const restoreRailFocus = Boolean(existingRail?.contains(document.activeElement));
   clear(app);
-  app.append(createHeader(), createStatusRegion());
+  const statusRegion = createStatusRegion();
+  app.append(createHeader(), ...(statusRegion ? [statusRegion] : []));
 
   if (state.phase === 'empty' || state.phase === 'loading') {
     app.append(
@@ -63,7 +85,7 @@ function renderApp(): void {
   if (!selectedPage) {
     app.append(
       element('main', { className: 'empty-shell' }, [
-        element('div', { className: 'notice notice-error', text: 'No page plan is available. Start over and load the PDF again.' }),
+        element('div', { className: 'notice notice-error', text: ko.noPagePlan }),
       ]),
     );
     return;
@@ -87,6 +109,11 @@ function renderApp(): void {
         savedLayouts: state.savedLayouts,
         selectedSavedLayoutId: state.selectedSavedLayoutId ?? '',
         saveCurrentLayoutDisabledReason: getSaveCurrentLayoutDisabledReason(selectedPage),
+        similarPageRange: similarPageRange(),
+        draft: inspectorDraft,
+        onDraftChange: (draft) => {
+          inspectorDraft = draft;
+        },
         onLayoutChange: handleLayoutChange,
         onApplyRange: handleApplyRange,
         onApplyCurrentTemplateToRange: handleApplyCurrentTemplateToRange,
@@ -107,6 +134,9 @@ function renderApp(): void {
     ]),
   );
   app.append(workspace);
+  const rail = app.querySelector<HTMLElement>('.thumbnail-rail');
+  if (rail) syncThumbnailRailScroll(rail, railScrollTop, selectionChanged, restoreRailFocus);
+  previousSelectedPageIndex = state.selectedPageIndex;
 
   void renderSelectedCanvas(selectedPage, generation);
 }
@@ -114,28 +144,30 @@ function renderApp(): void {
 function createHeader(): HTMLElement {
   return element('header', { className: 'top-bar' }, [
     element('div', { className: 'brand-block' }, [
-      element('span', { className: 'brand-mark', text: 'PDF' }),
+      element('span', { className: 'brand-mark', text: ko.brandMark }),
       element('div', {}, [
-        element('strong', { text: 'PDF Slide Splitter' }),
-        element('span', { text: 'Local handout conversion' }),
+        element('strong', { text: ko.appTitle }),
+        element('span', { text: ko.brandSubtitle }),
       ]),
     ]),
     element('div', { className: 'top-actions' }, [
-      element('span', { className: 'privacy-badge', text: 'No external upload' }),
+      element('span', { className: 'privacy-badge', text: ko.privacyBadge }),
       element('a', {
         className: 'help-link',
-        text: 'Limitations',
+        text: ko.helpLink,
         attrs: { href: '#limitations' },
       }),
     ]),
   ]);
 }
 
-function createStatusRegion(): HTMLElement {
+function createStatusRegion(): HTMLElement | null {
+  const text = state.errorMessage || state.statusMessage;
+  if (!text) return null;
   const statusClass = state.errorMessage ? 'status-region has-error' : 'status-region';
   return element('section', {
     className: statusClass,
-    text: state.errorMessage || state.statusMessage,
+    text,
     attrs: {
       'aria-live': state.phase === 'processing' || state.phase === 'error' ? 'assertive' : 'polite',
       'data-testid': 'status-region',
@@ -146,23 +178,24 @@ function createStatusRegion(): HTMLElement {
 function createPrivacyChecklist(): HTMLElement {
   return element('section', { className: 'privacy-checklist', attrs: { id: 'limitations' } }, [
     element('article', {}, [
-      element('h2', { text: 'Local-first by design' }),
-      element('p', { text: 'The app reads your selected PDF in browser memory, keeps saved crop layouts only for the current PDF session, and creates a new local download Blob. There is no analytics, upload endpoint, browser persistence, or backend processing path.' }),
+      element('h2', { text: ko.privacyLocalTitle }),
+      element('p', { text: ko.privacyLocalBody }),
     ]),
     element('article', {}, [
-      element('h2', { text: 'Review before export' }),
-      element('p', { text: 'Automatic layout suggestions are best-effort. Save Layout 1 from a representative page, rename or update it, then apply the saved crop layout to explicit page ranges. Existing pages change only when you apply or reapply a layout.' }),
+      element('h2', { text: ko.privacyReviewTitle }),
+      element('p', { text: ko.privacyReviewBody }),
     ]),
     element('article', {}, [
-      element('h2', { text: 'PDF-preserving output' }),
-      element('p', { text: 'The source PDF is left unchanged. Each exported slide is placed on an A4 landscape page for readers such as GoodNotes, with white padding when needed and vector/text fidelity where the browser PDF engine supports it.' }),
+      element('h2', { text: ko.privacyOutputTitle }),
+      element('p', { text: ko.privacyOutputBody }),
     ]),
   ]);
 }
 
 async function handleFile(file: File): Promise<void> {
   try {
-    dispatch({ type: 'loading', message: `Reading ${file.name} locally…` });
+    resetTransientUi();
+    dispatch({ type: 'loading', message: ko.readingFile(file.name) });
     if (loadedPdf?.pdfJsDocument.destroy) {
       await loadedPdf.pdfJsDocument.destroy();
     }
@@ -190,9 +223,10 @@ async function buildInitialPagePlans(pdf: LoadedPdf): Promise<PagePlan[]> {
   for (let index = 0; index < pdf.pageBoxes.length; index += 1) {
     const pageBox = pdf.pageBoxes[index];
     if (!pageBox) continue;
-    dispatch({ type: 'loading', message: `Analyzing page ${index + 1} of ${pdf.pageBoxes.length} locally…` });
+    dispatch({ type: 'loading', message: ko.analyzingPage(index + 1, pdf.pageBoxes.length) });
     try {
       const analysis = await renderPdfPageForAnalysisWithMetadata(pdf.pdfJsDocument, index + 1, 360);
+      pdf.pdfJsDocument.cleanup?.();
       const suggestion = suggestLayoutFromImage(analysis.imageData, pageBox);
       pages.push(createDetectedPlanFromSuggestion(index, pageBox, suggestion, 'projection-profile', analysis.metadata));
     } catch {
@@ -201,7 +235,7 @@ async function buildInitialPagePlans(pdf: LoadedPdf): Promise<PagePlan[]> {
         ...suggestion,
         confidence: 'review-needed',
         reviewState: 'review-needed',
-        reason: `Preview analysis failed. ${suggestion.reason}`,
+        reason: ko.analysisFailed(suggestion.reason),
       }, 'analysis-failed'));
     }
   }
@@ -240,7 +274,7 @@ async function renderSelectedCanvas(page: PagePlan, generation: number): Promise
     }
   } catch (error) {
     if (generation === renderGeneration) {
-      dispatch({ type: 'error', message: `Preview render failed: ${getErrorMessage(error)}` });
+      dispatch({ type: 'error', message: ko.previewFailed(getErrorMessage(error)) });
     }
   }
 }
@@ -255,6 +289,15 @@ function handleApplyRange(range: string, layoutId: LayoutPresetId): void {
   } catch (error) {
     dispatch({ type: 'error', message: getErrorMessage(error) });
   }
+}
+
+function similarPageRange(): string {
+  return pageNumbersWithSameInitialLayout(
+    state.pages.length,
+    state.initialPages.map((page) => page.layoutId),
+    state.pages.map((page) => page.layoutId),
+    state.selectedPageIndex,
+  ).join(',');
 }
 
 function handleApplyCurrentTemplateToRange(range: string): void {
@@ -375,8 +418,8 @@ function handleApplySavedLayout(range: string, layoutId: string): void {
 }
 
 function getSaveCurrentLayoutDisabledReason(page: PagePlan): string {
-  if (page.reviewState === 'review-needed') return 'Resolve review-needed crop boxes before saving this page as a layout.';
-  if (page.cropBoxes.length === 0) return 'Current page has no crop boxes to save as a layout.';
+  if (page.reviewState === 'review-needed') return ko.saveReview;
+  if (page.cropBoxes.length === 0) return ko.saveNoCrops;
   return '';
 }
 
@@ -399,22 +442,22 @@ async function handleConvert(): Promise<void> {
   });
   try {
     revokeObjectUrl();
-    dispatch({ type: 'processing', message: 'Converting cropped PDF pages locally…' });
+    dispatch({ type: 'processing', message: ko.converting });
     if (window.__pdfSlideSplitterTestHooks?.attemptNetworkDuringExport) {
       window.__pdfSlideSplitterTestHooks.attemptNetworkDuringExport = false;
       await probeNoUploadGuardForTest();
     }
     if (window.__pdfSlideSplitterTestHooks?.failNextExport) {
       window.__pdfSlideSplitterTestHooks.failNextExport = false;
-      throw new Error('Simulated browser export failure.');
+      throw new Error(ko.simulatedExportFailure);
     }
     const result = await createSplitPdf(loadedPdf.bytes, state.plan, (progress) => {
-      dispatch({ type: 'processing', message: `${progress.label} (${progress.completed}/${progress.total})` });
+      dispatch({ type: 'processing', message: ko.convertingProgress(progress.completed, progress.total) });
     });
     objectUrl = URL.createObjectURL(new Blob([toArrayBuffer(result.bytes)], { type: 'application/pdf' }));
-    dispatch({ type: 'success', result, message: `Export complete: ${result.outputFileName}` });
+    dispatch({ type: 'success', result, message: ko.exportComplete(result.outputFileName) });
   } catch (error) {
-    dispatch({ type: 'error', message: `Export failed gracefully: ${getErrorMessage(error)}` });
+    dispatch({ type: 'error', message: ko.exportFailed(getErrorMessage(error)) });
   } finally {
     guard.dispose();
   }
@@ -435,6 +478,7 @@ async function probeNoUploadGuardForTest(): Promise<void> {
 }
 
 function resetApp(): void {
+  resetTransientUi();
   revokeObjectUrl();
   if (loadedPdf?.pdfJsDocument.destroy) {
     void loadedPdf.pdfJsDocument.destroy();

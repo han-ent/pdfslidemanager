@@ -17,8 +17,8 @@ test('loads a PDF through the file picker shell without external upload requests
     }
   });
 
-  await expect(page.getByRole('heading', { name: /drop a lecture pdf/i })).toBeVisible();
-  await expect(page.getByText('Processed locally in your browser').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: '강의 PDF를 올려 슬라이드별로 나누세요' })).toBeVisible();
+  await expect(page.getByText('이 브라우저 안에서만 처리합니다').first()).toBeVisible();
 
   await page.getByTestId('pdf-input').setInputFiles(resolve('tests/fixtures/generated/upload-shell.pdf'));
 

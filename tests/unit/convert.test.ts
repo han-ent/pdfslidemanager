@@ -60,7 +60,7 @@ describe('convertPdfSlides', () => {
   it('rejects crop boxes outside the effective page bounds', () => {
     expect(() =>
       validateCropBox({ left: 590, bottom: 0, width: 20, height: 20 }, { left: 0, bottom: 0, width: 600, height: 400 }, 'bad crop'),
-    ).toThrow(/outside the effective source page box/);
+    ).toThrow(/바깥/);
   });
 
   it('returns soft workload warnings for large browser-only conversion estimates', () => {

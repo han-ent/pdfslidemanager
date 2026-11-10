@@ -70,12 +70,12 @@ describe('G001 geometry model regressions', () => {
     );
 
     expect(catalog).toEqual({
-      'one-up': { label: '1x1', columns: 1, rows: 1, readingOrder: 'row-major' },
-      'two-up-vertical': { label: '1x2', columns: 1, rows: 2, readingOrder: 'row-major' },
-      'two-up-horizontal': { label: '2x1', columns: 2, rows: 1, readingOrder: 'row-major' },
-      'two-by-two': { label: '2x2', columns: 2, rows: 2, readingOrder: 'row-major' },
-      'two-by-three': { label: '2x3', columns: 2, rows: 3, readingOrder: 'row-major' },
-      'three-by-two': { label: '3x2', columns: 3, rows: 2, readingOrder: 'row-major' },
+      'one-up': { label: '1×1', columns: 1, rows: 1, readingOrder: 'row-major' },
+      'two-up-vertical': { label: '1×2', columns: 1, rows: 2, readingOrder: 'row-major' },
+      'two-up-horizontal': { label: '2×1', columns: 2, rows: 1, readingOrder: 'row-major' },
+      'two-by-two': { label: '2×2', columns: 2, rows: 2, readingOrder: 'row-major' },
+      'two-by-three': { label: '2×3', columns: 2, rows: 3, readingOrder: 'row-major' },
+      'three-by-two': { label: '3×2', columns: 3, rows: 2, readingOrder: 'row-major' },
     });
   });
 
@@ -293,8 +293,8 @@ describe('G001 geometry model regressions', () => {
     const pages = [createPagePlan(0, pageBox, 'one-up'), createPagePlan(1, pageBox, 'two-by-two')];
     const emptySource: PagePlan = { ...pages[0]!, cropBoxes: [], crops: [] };
 
-    expect(() => applyCropTemplateToPageRange(pages, '2', emptySource)).toThrow(/no crop boxes/i);
-    expect(() => applyCropTemplateToPageRange(pages, '3', pages[0]!)).toThrow(/outside 1-2/i);
+    expect(() => applyCropTemplateToPageRange(pages, '2', emptySource)).toThrow(/자르기 영역이 없습니다/);
+    expect(() => applyCropTemplateToPageRange(pages, '3', pages[0]!)).toThrow(/1-2/);
     expect(pages[0]?.cropBoxes).toHaveLength(1);
     expect(pages[1]?.cropBoxes).toHaveLength(4);
   });
@@ -393,13 +393,13 @@ describe('G001 geometry model regressions', () => {
 
     expect(saved).toMatchObject({
       id: 'layout-a',
-      name: 'Layout 1',
+      name: '레이아웃 1',
       sourcePageIndex: 2,
       sourcePageNumber: 3,
     });
     expect(saved.template).toMatchObject({
       layoutId: 'two-up-horizontal',
-      label: '2x1',
+      label: '2×1',
       columns: 2,
       rows: 1,
       readingOrder: 'row-major',
@@ -427,8 +427,8 @@ describe('G001 geometry model regressions', () => {
     };
     const saved = createSavedLayoutTemplateFromPage(readySource, { existingLayouts: [], id: 'layout-a' });
 
-    expect(() => createSavedLayoutTemplateFromPage(reviewNeededSource, { existingLayouts: [], id: 'layout-b' })).toThrow(/review-needed/i);
-    expect(() => updateSavedLayoutTemplateFromPage(saved, reviewNeededSource)).toThrow(/review-needed/i);
+    expect(() => createSavedLayoutTemplateFromPage(reviewNeededSource, { existingLayouts: [], id: 'layout-b' })).toThrow(/확인이 필요/);
+    expect(() => updateSavedLayoutTemplateFromPage(saved, reviewNeededSource)).toThrow(/확인이 필요/);
   });
 
   it('applies a saved layout only to the requested page list and scales from sourcePageIndex context', () => {
@@ -448,8 +448,8 @@ describe('G001 geometry model regressions', () => {
     expect(templated[1]).not.toBe(pages[1]);
     expect(templated[3]).not.toBe(pages[3]);
     expect(templated.map((page) => page.cropBoxes.length)).toEqual([2, 2, 4, 2]);
-    expect(templated[1]).toMatchObject({ origin: 'manual', overridden: true, reason: 'Applied saved crop layout "Layout 1".' });
-    expect(templated[3]).toMatchObject({ origin: 'manual', overridden: true, reason: 'Applied saved crop layout "Layout 1".' });
+    expect(templated[1]).toMatchObject({ origin: 'manual', overridden: true, reason: 'Applied saved crop layout "레이아웃 1".' });
+    expect(templated[3]).toMatchObject({ origin: 'manual', overridden: true, reason: 'Applied saved crop layout "레이아웃 1".' });
     expect(templated[1]?.cropBoxes.map((crop) => [crop.label, pickBox(crop)])).toEqual([
       ['A', { x: 10, y: 20, width: 110, height: 140 }],
       ['B', { x: 155, y: 20, width: 110, height: 140 }],
@@ -477,11 +477,11 @@ describe('G001 geometry model regressions', () => {
       },
     };
 
-    expect(() => applySavedLayoutTemplateToPageRange(pages, '2', emptySaved)).toThrow(/no crop boxes|empty/i);
+    expect(() => applySavedLayoutTemplateToPageRange(pages, '2', emptySaved)).toThrow(/자르기/);
     expect(serializePages(pages)).toBe(before);
 
     const validSaved = createSavedLayoutTemplateFromPage(pages[0]!, { existingLayouts: [], id: 'layout-a' });
-    expect(() => applySavedLayoutTemplateToPageRange(pages, '5', validSaved)).toThrow(/outside 1-4/i);
+    expect(() => applySavedLayoutTemplateToPageRange(pages, '5', validSaved)).toThrow(/1-4/);
     expect(serializePages(pages)).toBe(before);
   });
 
@@ -542,19 +542,19 @@ describe('G001 geometry model regressions', () => {
     const page = createManualTemplateSourcePage();
     const layoutOne = createSavedLayoutTemplateFromPage(page, { existingLayouts: [], id: 'layout-1' });
     const custom = { ...createSavedLayoutTemplateFromPage(page, { existingLayouts: [layoutOne], id: 'layout-2' }), name: 'Body' };
-    const layoutThree = { ...createSavedLayoutTemplateFromPage(page, { existingLayouts: [layoutOne, custom], id: 'layout-3' }), name: 'Layout 3' };
+    const layoutThree = { ...createSavedLayoutTemplateFromPage(page, { existingLayouts: [layoutOne, custom], id: 'layout-3' }), name: '레이아웃 3' };
     const layouts = [layoutOne, custom, layoutThree];
 
-    expect(getNextSavedLayoutName(layouts)).toBe('Layout 2');
+    expect(getNextSavedLayoutName(layouts)).toBe('레이아웃 2');
 
     const renamed = renameSavedLayoutTemplate(layouts, layoutOne.id, '  Intro  ');
 
     expect(renamed.find((layout) => layout.id === layoutOne.id)?.name).toBe('Intro');
-    expect(layoutOne.name).toBe('Layout 1');
-    expect(getNextSavedLayoutName(renamed)).toBe('Layout 1');
+    expect(layoutOne.name).toBe('레이아웃 1');
+    expect(getNextSavedLayoutName(renamed)).toBe('레이아웃 1');
 
-    expect(() => renameSavedLayoutTemplate(renamed, custom.id, ' intro ')).toThrow(/duplicate|unique|already in use/i);
-    expect(() => renameSavedLayoutTemplate(renamed, custom.id, '   ')).toThrow(/empty|name/i);
+    expect(() => renameSavedLayoutTemplate(renamed, custom.id, ' intro ')).toThrow(/이미/);
+    expect(() => renameSavedLayoutTemplate(renamed, custom.id, '   ')).toThrow(/이름/);
     expect(renamed.find((layout) => layout.id === custom.id)?.name).toBe('Body');
   });
 

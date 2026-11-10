@@ -185,7 +185,7 @@ describe('app state reducer', () => {
       sourcePageNumber: 1,
     });
     expect(saved.selectedSavedLayoutId).toBe('layout-a');
-    expect(saved.statusMessage).toContain('Saved crop layout "Opening"');
+    expect(saved.statusMessage).toContain('Opening');
     expect(saved).not.toHaveProperty('layoutLibrary');
     expect(saved).not.toHaveProperty('persistedSavedLayouts');
 
@@ -209,9 +209,7 @@ describe('app state reducer', () => {
     });
     expect(withSecond.savedLayouts.map((layout) => layout.name)).toEqual(['Intro', 'Body']);
     expect(withSecond.selectedSavedLayoutId).toBe('layout-b');
-    expect(() => reduceAppState(withSecond, { type: 'rename-saved-layout', savedLayoutId: 'layout-b', name: 'intro' })).toThrow(
-      /duplicate|unique|already in use/i,
-    );
+    expect(() => reduceAppState(withSecond, { type: 'rename-saved-layout', savedLayoutId: 'layout-b', name: 'intro' })).toThrow(/이미/);
 
     const selectedFirstAgain = reduceAppState(withSecond, { type: 'select-saved-layout', savedLayoutId: 'layout-a' });
     const deletedInactive = reduceAppState(selectedFirstAgain, { type: 'delete-saved-layout', savedLayoutId: 'layout-b' });
@@ -255,14 +253,10 @@ describe('app state reducer', () => {
     const readyBefore = JSON.stringify(ready);
     const savedBefore = JSON.stringify(saved);
 
-    expect(() => reduceAppState(ready, { type: 'save-saved-layout', page: reviewNeededPage })).toThrow(/review-needed/i);
-    expect(() => reduceAppState(ready, { type: 'save-saved-layout', page: noCropPage })).toThrow(/no crop boxes/i);
-    expect(() => reduceAppState(saved, { type: 'update-saved-layout', savedLayoutId: 'layout-a', page: reviewNeededPage })).toThrow(
-      /review-needed/i,
-    );
-    expect(() => reduceAppState(saved, { type: 'update-saved-layout', savedLayoutId: 'layout-a', page: noCropPage })).toThrow(
-      /no crop boxes/i,
-    );
+    expect(() => reduceAppState(ready, { type: 'save-saved-layout', page: reviewNeededPage })).toThrow(/확인이 필요/);
+    expect(() => reduceAppState(ready, { type: 'save-saved-layout', page: noCropPage })).toThrow(/자르기 영역이 없습니다/);
+    expect(() => reduceAppState(saved, { type: 'update-saved-layout', savedLayoutId: 'layout-a', page: reviewNeededPage })).toThrow(/확인이 필요/);
+    expect(() => reduceAppState(saved, { type: 'update-saved-layout', savedLayoutId: 'layout-a', page: noCropPage })).toThrow(/자르기 영역이 없습니다/);
     expect(JSON.stringify(ready)).toBe(readyBefore);
     expect(JSON.stringify(saved)).toBe(savedBefore);
   });

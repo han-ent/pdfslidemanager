@@ -1,3 +1,4 @@
+import { ko } from '../i18n/ko';
 import type { AnalysisRenderMetadata, PdfBox } from '../types';
 import type { PdfJsDocumentLike, PdfJsViewportLike } from './load';
 
@@ -17,9 +18,12 @@ export async function renderPdfPageForAnalysisWithMetadata(pdf: PdfJsDocumentLik
   const canvas = document.createElement('canvas');
   const viewport = await renderPdfPageToCanvas(pdf, pageNumber, canvas, maxWidth);
   const context = canvas.getContext('2d', { willReadFrequently: true });
-  if (!context) throw new Error('Canvas 2D context is unavailable for preview analysis.');
+  if (!context) throw new Error(ko.analysisCanvasUnavailable);
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  canvas.width = 0;
+  canvas.height = 0;
   return {
-    imageData: context.getImageData(0, 0, canvas.width, canvas.height),
+    imageData,
     metadata: {
       pixelWidth: canvas.width,
       pixelHeight: canvas.height,
@@ -47,9 +51,13 @@ export async function renderPdfPageToCanvas(pdf: PdfJsDocumentLike, pageNumber: 
   canvas.style.width = `${Math.round(viewport.width)}px`;
   canvas.style.height = `${Math.round(viewport.height)}px`;
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('Canvas 2D context is unavailable.');
+  if (!context) throw new Error(ko.canvasUnavailable);
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  await page.render({ canvasContext: context, viewport }).promise;
+  try {
+    await page.render({ canvasContext: context, viewport }).promise;
+  } finally {
+    page.cleanup?.(true);
+  }
   return viewport;
 }
 

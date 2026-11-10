@@ -17,8 +17,8 @@ describe('export UI helpers', () => {
   });
 
   it('explains disabled export states', () => {
-    expect(describeExportDisabledReason({})).toMatch(/Choose a local PDF/);
-    expect(describeExportDisabledReason({ sourceBytes: new Uint8Array([1]), plan: { regions: [] } })).toMatch(/at least one slide crop/);
+    expect(describeExportDisabledReason({})).toMatch(/PDF를 선택/);
+    expect(describeExportDisabledReason({ sourceBytes: new Uint8Array([1]), plan: { regions: [] } })).toMatch(/하나 이상/);
     expect(
       describeExportDisabledReason({
         sourceBytes: new Uint8Array([1]),
@@ -26,7 +26,7 @@ describe('export UI helpers', () => {
         requireReview: true,
         reviewAccepted: false,
       }),
-    ).toMatch(/Review the suggested layout/);
+    ).toMatch(/레이아웃을 확인/);
     expect(
       describeExportDisabledReason({
         sourceBytes: new Uint8Array([1]),
@@ -34,7 +34,7 @@ describe('export UI helpers', () => {
         requireReview: true,
         reviewAccepted: false,
       }),
-    ).toMatch(/Review the suggested layout/);
+    ).toMatch(/레이아웃을 확인/);
   });
 
   it('preserves the confirmed plan and reports a local error when conversion fails', async () => {
@@ -57,7 +57,7 @@ describe('export UI helpers', () => {
 
     expect(states).toEqual(['processing', 'error']);
     expect(finalState.status).toBe('error');
-    expect(finalState.message).toContain('Your layout edits are preserved');
+    expect(finalState.message).toContain('편집 내용은 그대로입니다');
     expect(finalState.preservedPlan).toBe(request.plan);
   });
 
