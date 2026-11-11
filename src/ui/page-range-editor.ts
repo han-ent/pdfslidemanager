@@ -1,4 +1,4 @@
-import { ko, type ApplyScope } from '../i18n/ko';
+import { ko, type ApplyScope } from '../i18n';
 import { LAYOUT_PRESETS } from '../pdf/grid';
 import type { LayoutPresetId, PagePlan, SavedLayoutTemplate } from '../types';
 import { element } from './dom';

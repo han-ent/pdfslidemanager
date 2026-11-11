@@ -1,5 +1,5 @@
 import './styles.css';
-import { ko } from './i18n/ko';
+import { applyDocumentLocale, getLocale, ko, setLocale, subscribeLocale, type LocaleId } from './i18n';
 import { createSplitPdf } from './pdf/convert';
 import { applyCropBoxOverride, applyCropTemplateToPageRange, applyLayoutToPageRange, applyOutputCropBoxesOverride, buildConversionPlan, createDetectedPagePlan, pageNumbersWithSameInitialLayout, updatePageLayout } from './pdf/grid';
 import { suggestLayoutFromImage, suggestLayoutFromPageBox, type LayoutSuggestion } from './pdf/layout-detect';
@@ -28,9 +28,10 @@ declare global {
   }
 }
 
-document.documentElement.lang = ko.htmlLang;
-document.title = ko.appTitle;
-document.querySelector('meta[name="description"]')?.setAttribute('content', ko.metaDescription);
+applyDocumentLocale();
+subscribeLocale(() => {
+  renderApp();
+});
 
 const appRoot = document.querySelector<HTMLDivElement>('#app');
 if (!appRoot) {
@@ -157,8 +158,38 @@ function createHeader(): HTMLElement {
         text: ko.helpLink,
         attrs: { href: '#limitations' },
       }),
+      createLanguageToggle(),
     ]),
   ]);
+}
+
+function createLanguageToggle(): HTMLElement {
+  const current = getLocale();
+  const group = element('div', {
+    className: 'lang-toggle',
+    attrs: { role: 'group', 'aria-label': ko.languageLabel, 'data-testid': 'language-toggle' },
+  });
+  group.append(createLanguageButton('ko', '한', current === 'ko'), createLanguageButton('en', 'EN', current === 'en'));
+  return group;
+}
+
+function createLanguageButton(locale: LocaleId, label: string, pressed: boolean): HTMLButtonElement {
+  const button = element('button', {
+    className: 'lang-option',
+    text: label,
+    attrs: {
+      type: 'button',
+      lang: locale,
+      'aria-pressed': pressed ? 'true' : 'false',
+      'data-testid': `language-${locale}`,
+    },
+  });
+  button.addEventListener('click', () => {
+    if (getLocale() === locale) return;
+    setLocale(locale);
+    app.querySelector<HTMLButtonElement>(`[data-testid="language-${locale}"]`)?.focus();
+  });
+  return button;
 }
 
 function createStatusRegion(): HTMLElement | null {

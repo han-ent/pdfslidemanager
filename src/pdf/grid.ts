@@ -1,4 +1,4 @@
-import { ko, layoutLabels } from '../i18n/ko';
+import { ko, layoutLabels } from '../i18n';
 import type {
   ConversionPlan,
   CropBox,

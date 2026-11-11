@@ -1,4 +1,4 @@
-import { layoutLabels } from '../i18n/ko';
+import { layoutLabels } from '../i18n';
 import type { ConfidenceLevel, DetectedCropRect, DetectionMetadata, GridSpec, LayoutPresetId, PageBox, ReviewState } from '../types';
 import { LAYOUT_PRESETS } from './grid';
 import { detectProjectionLayout, geometryFallbackDetection } from './projection-detect';
