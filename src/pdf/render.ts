@@ -1,4 +1,4 @@
-import { ko } from '../i18n/ko';
+import { ko } from '../i18n';
 import type { AnalysisRenderMetadata, PdfBox } from '../types';
 import type { PdfJsDocumentLike, PdfJsViewportLike } from './load';
 

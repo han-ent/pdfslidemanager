@@ -1,4 +1,4 @@
-import { ko } from '../i18n/ko';
+import { ko } from '../i18n';
 import { element } from './dom';
 
 export interface DropZoneOptions {

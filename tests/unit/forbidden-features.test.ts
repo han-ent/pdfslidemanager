@@ -97,7 +97,7 @@ describe('forbidden feature guardrails', () => {
   });
 
   it('keeps browser persistence and library-storage APIs out of app source', () => {
-    expect(findUnexpectedSourceMatches(PERSISTENCE_BROWSER_APIS)).toEqual([]);
+    expect(findUnexpectedSourceMatches(PERSISTENCE_BROWSER_APIS, isAllowedLocalePreferenceMatch)).toEqual([]);
   });
 });
 
@@ -136,6 +136,10 @@ function findUnexpectedSourceMatches(patterns: readonly RegExp[], isAllowed: (ma
       );
     })
     .sort();
+}
+
+function isAllowedLocalePreferenceMatch(match: SourceMatch): boolean {
+  return match.relativePath === 'src/i18n/locale.ts' && String(match.pattern) === String(/\blocalStorage\b/);
 }
 
 function isAllowedUploadGuardMatch(match: SourceMatch): boolean {

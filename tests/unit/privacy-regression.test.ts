@@ -12,8 +12,11 @@ const PACKAGE_LOCK = JSON.parse(readFileSync(resolve(REPO_ROOT, 'package-lock.js
 };
 
 describe('privacy and dependency regression guardrails', () => {
-  it('keeps saved layouts session-only by avoiding browser persistence APIs', () => {
-    expect(findForbiddenSourceMatches([/\blocalStorage\b/, /\bsessionStorage\b/, /\bindexedDB\b/, /\bcaches\s*\./])).toEqual([]);
+  it('keeps saved layouts session-only and limits localStorage to the language preference', () => {
+    expect(findForbiddenSourceMatches([/\bsessionStorage\b/, /\bindexedDB\b/, /\bcaches\s*\./])).toEqual([]);
+    const localStorageHits = findForbiddenSourceMatches([/\blocalStorage\b/]);
+    expect(localStorageHits.every((hit) => hit.startsWith('src/i18n/locale.ts:'))).toBe(true);
+    expect(localStorageHits.length).toBeGreaterThan(0);
   });
 
   it('does not add cloud or AI SDK imports to the app source', () => {

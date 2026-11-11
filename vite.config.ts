@@ -10,6 +10,7 @@ export default defineConfig({
   test: {
     include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'],
     environment: 'jsdom',
+    setupFiles: ['./tests/setup.ts', './tests/setup-locale.ts'],
     globals: true,
     coverage: {
       reporter: ['text', 'lcov']

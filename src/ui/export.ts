@@ -1,4 +1,4 @@
-import { ko } from '../i18n/ko';
+import { ko } from '../i18n';
 import { createSplitPdf } from '../pdf/convert';
 import type { ConversionPlan } from '../types';
 import type { AppState } from '../state/store';

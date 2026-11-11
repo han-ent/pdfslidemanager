@@ -1,5 +1,5 @@
 import { degrees, PDFDocument, rgb, type PDFPage } from 'pdf-lib';
-import { ko } from '../i18n/ko';
+import { ko } from '../i18n';
 import type { ConversionPlan as AppConversionPlan, CropBox, ExportResult, PageBox, PdfBox, WorkloadWarning } from '../types';
 import { assertCropBoxesBounded } from './grid';
 import { hashBytes } from './hash';

@@ -2,7 +2,9 @@
 
 강의나 학회 유인물 PDF를 브라우저 안에서 슬라이드별 PDF로 나눕니다. 파일은 올리지 않고, 내 기기에서만 처리합니다.
 
-앱: https://ys-laube.github.io/pdfslidemanager/
+앱: https://han-ent.github.io/pdfslidemanager/
+
+오른쪽 위의 **한/EN**으로 언어를 바꿉니다. 선택하면 이 브라우저에 기억됩니다. PDF나 자르기 정보는 저장하지 않습니다.
 
 ## 사용법
 
@@ -20,7 +22,9 @@
 
 PDF Slide Splitter is a static browser web app that turns multi-slide lecture or conference handout PDFs into one-slide-per-page PDFs for study workflows such as GoodNotes.
 
-Live app: https://ys-laube.github.io/pdfslidemanager/
+Live app: https://han-ent.github.io/pdfslidemanager/
+
+Use the **한/EN** control in the header to switch between Korean and English. The choice is remembered in this browser under `pdfslidemanager.locale`. That language preference is the only value written to `localStorage`. Crop layouts and PDFs are not stored.
 
 ## Privacy and runtime model
 

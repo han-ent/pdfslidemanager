@@ -9,6 +9,7 @@ export const ko = {
   brandSubtitle: '강의 유인물 정리',
   privacyBadge: '업로드 없음 · 내 기기에서만 처리',
   helpLink: '안내',
+  languageLabel: '언어',
 
   dropEyebrow: 'PDF 슬라이드 나누기',
   dropTitle: '강의 PDF를 올려 슬라이드별로 나누세요',
@@ -185,3 +186,10 @@ export const layoutLabels: Readonly<Record<LayoutPresetId, string>> = Object.fre
 });
 
 export type ApplyScope = 'page' | 'similar' | 'range';
+
+type StringMessage<T> = T extends (...args: infer A) => unknown ? (...args: A) => string : string;
+
+/** Same keys and function arguments as `ko`, with string values free to differ by language. */
+export type MessageCatalog = {
+  [K in keyof typeof ko]: StringMessage<(typeof ko)[K]>;
+};

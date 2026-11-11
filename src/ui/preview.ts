@@ -1,4 +1,4 @@
-import { ko } from '../i18n/ko';
+import { ko } from '../i18n';
 import type { CropBox, PageBox, PagePlan, PdfBox } from '../types';
 import { A4_LANDSCAPE_PAGE, fitCropWithinA4Landscape } from '../pdf/convert';
 import { pdfBoxToVisualRect, visualPageSize, visualRectToPdfBox } from '../pdf/grid';

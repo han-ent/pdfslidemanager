@@ -1,4 +1,4 @@
-import { ko } from '../i18n/ko';
+import { ko } from '../i18n';
 import type { LoadedPdfSummary, WorkloadWarning } from '../types';
 
 const LARGE_FILE_BYTES = 100 * 1024 * 1024;
